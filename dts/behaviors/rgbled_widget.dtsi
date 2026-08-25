@@ -1,26 +1,35 @@
 / {
     behaviors {
-        /omit-if-no-ref/ ind_bat: ind_bat {
+        /*
+         * NOTE: none of these use /omit-if-no-ref/, unlike upstream.
+         *
+         * All three carry BEHAVIOR_LOCALITY_GLOBAL, so pressing one on the
+         * central makes ZMK invoke it by name on every peripheral as well
+         * (see zmk_behavior_invoke_binding() in app/src/behavior.c). A split
+         * peripheral is often built without a keymap, so nothing there would
+         * reference the node -- omit-if-no-ref would then drop it from the
+         * devicetree and the lookup on that side would return NULL, logging
+         * "No behavior assigned" instead of blinking.
+         */
+        ind_bat: ind_bat {
             compatible = "zmk,behavior-rgbled-widget";
             #binding-cells = <0>;
             indicate-battery;
         };
-        /omit-if-no-ref/ ind_con: ind_con {
+        ind_con: ind_con {
             compatible = "zmk,behavior-rgbled-widget";
             #binding-cells = <0>;
             indicate-connectivity;
         };
-        /omit-if-no-ref/ ind_lyr: ind_lyr {
+        ind_lyr: ind_lyr {
             compatible = "zmk,behavior-rgbled-widget";
             #binding-cells = <0>;
             indicate-layer;
         };
 
         /*
-         * NOTE: deliberately NOT /omit-if-no-ref/. This node is never named in
-         * a keymap -- the central looks it up by name over the split link -- so
-         * omit-if-no-ref would drop it from the devicetree and the lookup on
-         * the peripheral would return NULL.
+         * Never named in a keymap -- the central looks it up by name over the
+         * split link -- so it must not be omit-if-no-ref either.
          */
         lyr_sync: lyr_sync {
             compatible = "zmk,behavior-rgbled-sync";
