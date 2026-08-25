@@ -1,13 +1,3 @@
-# Color definitions to use with color settings
-COLOR_BLACK   := 0
-COLOR_RED     := 1
-COLOR_GREEN   := 2
-COLOR_YELLOW  := 3
-COLOR_BLUE    := 4
-COLOR_MAGENTA := 5
-COLOR_CYAN    := 6
-COLOR_WHITE   := 7
-
 config RGBLED_WIDGET
     bool "Enable RGB LED widget for showing battery and output status"
 
@@ -56,30 +46,25 @@ config RGBLED_WIDGET_BATTERY_LEVEL_CRITICAL
     int "Critical battery level percentage"
     default 5
 
-config RGBLED_WIDGET_BATTERY_COLOR_HIGH
-    int "Color for high battery level (above LEVEL_HIGH)"
-    range 0 7
-    default $(COLOR_GREEN)
+config RGBLED_WIDGET_BATTERY_RGB_HIGH
+    hex "Color for high battery level (above LEVEL_HIGH) (0xRRGGBB)"
+    default 0x00FF00
 
-config RGBLED_WIDGET_BATTERY_COLOR_MEDIUM
-    int "Color for medium battery level (between LEVEL_LOW and LEVEL_HIGH)"
-    range 0 7
-    default $(COLOR_YELLOW)
+config RGBLED_WIDGET_BATTERY_RGB_MEDIUM
+    hex "Color for medium battery level (between LEVEL_LOW and LEVEL_HIGH) (0xRRGGBB)"
+    default 0xFFFF00
 
-config RGBLED_WIDGET_BATTERY_COLOR_LOW
-    int "Color for low battery level (below LEVEL_LOW)"
-    range 0 7
-    default $(COLOR_RED)
+config RGBLED_WIDGET_BATTERY_RGB_LOW
+    hex "Color for low battery level (below LEVEL_LOW) (0xRRGGBB)"
+    default 0xFF0000
 
-config RGBLED_WIDGET_BATTERY_COLOR_CRITICAL
-    int "Color for critical battery level (below LEVEL_CRITICAL)"
-    range 0 7
-    default $(COLOR_RED)
+config RGBLED_WIDGET_BATTERY_RGB_CRITICAL
+    hex "Color for critical battery level (below LEVEL_CRITICAL) (0xRRGGBB)"
+    default 0xFF0000
 
-config RGBLED_WIDGET_BATTERY_COLOR_MISSING
-    int "Color for battery not detected, or peripheral disconnected"
-    range 0 7
-    default $(COLOR_MAGENTA)
+config RGBLED_WIDGET_BATTERY_RGB_MISSING
+    hex "Color for battery not detected, or peripheral disconnected (0xRRGGBB)"
+    default 0xFF00FF
 
 # Connectivity indicator settings
 config RGBLED_WIDGET_CONN_BLINK_MS
@@ -93,25 +78,21 @@ config RGBLED_WIDGET_OUTPUT_BLINK_MS  # DEPRECATED, do not use
     int
     default 1000
 
-config RGBLED_WIDGET_CONN_COLOR_CONNECTED
-    int "Color for connected BLE connection status"
-    range 0 7
-    default $(COLOR_BLUE)
+config RGBLED_WIDGET_CONN_RGB_CONNECTED
+    hex "Color for connected BLE connection status (0xRRGGBB)"
+    default 0x0000FF
 
-config RGBLED_WIDGET_CONN_COLOR_ADVERTISING
-    int "Color for advertising BLE connection status"
-    range 0 7
-    default $(COLOR_YELLOW)
+config RGBLED_WIDGET_CONN_RGB_ADVERTISING
+    hex "Color for advertising BLE connection status (0xRRGGBB)"
+    default 0xFFFF00
 
-config RGBLED_WIDGET_CONN_COLOR_DISCONNECTED
-    int "Color for disconnected BLE connection status"
-    range 0 7
-    default $(COLOR_RED)
+config RGBLED_WIDGET_CONN_RGB_DISCONNECTED
+    hex "Color for disconnected BLE connection status (0xRRGGBB)"
+    default 0xFF0000
 
-config RGBLED_WIDGET_CONN_COLOR_USB
-    int "Color for USB endpoint active"
-    range 0 7
-    default $(COLOR_CYAN)
+config RGBLED_WIDGET_CONN_RGB_USB
+    hex "Color for USB endpoint active (0xRRGGBB)"
+    default 0x00FFFF
 
 # Layer indicator settings
 config RGBLED_WIDGET_SHOW_LAYER_CHANGE
@@ -121,10 +102,9 @@ config RGBLED_WIDGET_LAYER_BLINK_MS
     int "Blink and wait duration for layer indicator"
     default 100
 
-config RGBLED_WIDGET_LAYER_COLOR
-    int "Color to use for layer indicator"
-    range 0 7
-    default $(COLOR_CYAN)
+config RGBLED_WIDGET_LAYER_RGB
+    hex "Color to use for layer indicator (0xRRGGBB)"
+    default 0x00FFFF
 
 config RGBLED_WIDGET_LAYER_DEBOUNCE_MS
     int "Wait duration after a layer change before showing the highest active layer"
@@ -134,170 +114,243 @@ config RGBLED_WIDGET_LAYER_DEBOUNCE_MS
 config RGBLED_WIDGET_SHOW_LAYER_COLORS
     bool "Use custom colors for layers"
 
-config RGBLED_WIDGET_LAYER_0_COLOR
-    int "Color to use for the base layer"
-    range 0 7
-    default $(COLOR_BLACK)
+config RGBLED_WIDGET_LAYER_0_RGB
+    hex "Color to use for the base layer (0xRRGGBB)"
+    default 0x000000
 
-config RGBLED_WIDGET_LAYER_1_COLOR
-    int "Color to use for layer 1"
-    range 0 7
-    default $(COLOR_RED)
+config RGBLED_WIDGET_LAYER_1_RGB
+    hex "Color to use for layer 1 (0xRRGGBB)"
+    default 0x000000
 
-config RGBLED_WIDGET_LAYER_2_COLOR
-    int "Color to use for layer 2"
-    range 0 7
-    default $(COLOR_GREEN)
+config RGBLED_WIDGET_LAYER_2_RGB
+    hex "Color to use for layer 2 (0xRRGGBB)"
+    default 0x000000
 
-config RGBLED_WIDGET_LAYER_3_COLOR
-    int "Color to use for layer 3"
-    range 0 7
-    default $(COLOR_YELLOW)
+config RGBLED_WIDGET_LAYER_3_RGB
+    hex "Color to use for layer 3 (0xRRGGBB)"
+    default 0x000000
 
-config RGBLED_WIDGET_LAYER_4_COLOR
-    int "Color to use for layer 4"
-    range 0 7
-    default $(COLOR_BLUE)
+config RGBLED_WIDGET_LAYER_4_RGB
+    hex "Color to use for layer 4 (0xRRGGBB)"
+    default 0x000000
 
-config RGBLED_WIDGET_LAYER_5_COLOR
-    int "Color to use for layer 5"
-    range 0 7
-    default $(COLOR_MAGENTA)
+config RGBLED_WIDGET_LAYER_5_RGB
+    hex "Color to use for layer 5 (0xRRGGBB)"
+    default 0x000000
 
-config RGBLED_WIDGET_LAYER_6_COLOR
-    int "Color to use for layer 6"
-    range 0 7
-    default $(COLOR_CYAN)
+config RGBLED_WIDGET_LAYER_6_RGB
+    hex "Color to use for layer 6 (0xRRGGBB)"
+    default 0x000000
 
-config RGBLED_WIDGET_LAYER_7_COLOR
-    int "Color to use for layer 7"
-    range 0 7
-    default $(COLOR_WHITE)
+config RGBLED_WIDGET_LAYER_7_RGB
+    hex "Color to use for layer 7 (0xRRGGBB)"
+    default 0x000000
 
-config RGBLED_WIDGET_LAYER_8_COLOR
-    int "Color to use for layer 8"
-    range 0 7
-    default $(COLOR_BLACK)
+config RGBLED_WIDGET_LAYER_8_RGB
+    hex "Color to use for layer 8 (0xRRGGBB)"
+    default 0x000000
 
-config RGBLED_WIDGET_LAYER_9_COLOR
-    int "Color to use for layer 9"
-    range 0 7
-    default $(COLOR_BLACK)
+config RGBLED_WIDGET_LAYER_9_RGB
+    hex "Color to use for layer 9 (0xRRGGBB)"
+    default 0x000000
 
-config RGBLED_WIDGET_LAYER_10_COLOR
-    int "Color to use for layer 10"
-    range 0 7
-    default $(COLOR_BLACK)
+config RGBLED_WIDGET_LAYER_10_RGB
+    hex "Color to use for layer 10 (0xRRGGBB)"
+    default 0x000000
 
-config RGBLED_WIDGET_LAYER_11_COLOR
-    int "Color to use for layer 11"
-    range 0 7
-    default $(COLOR_BLACK)
+config RGBLED_WIDGET_LAYER_11_RGB
+    hex "Color to use for layer 11 (0xRRGGBB)"
+    default 0x000000
 
-config RGBLED_WIDGET_LAYER_12_COLOR
-    int "Color to use for layer 12"
-    range 0 7
-    default $(COLOR_BLACK)
+config RGBLED_WIDGET_LAYER_12_RGB
+    hex "Color to use for layer 12 (0xRRGGBB)"
+    default 0x000000
 
-config RGBLED_WIDGET_LAYER_13_COLOR
-    int "Color to use for layer 13"
-    range 0 7
-    default $(COLOR_BLACK)
+config RGBLED_WIDGET_LAYER_13_RGB
+    hex "Color to use for layer 13 (0xRRGGBB)"
+    default 0x000000
 
-config RGBLED_WIDGET_LAYER_14_COLOR
-    int "Color to use for layer 14"
-    range 0 7
-    default $(COLOR_BLACK)
+config RGBLED_WIDGET_LAYER_14_RGB
+    hex "Color to use for layer 14 (0xRRGGBB)"
+    default 0x000000
 
-config RGBLED_WIDGET_LAYER_15_COLOR
-    int "Color to use for layer 15"
-    range 0 7
-    default $(COLOR_BLACK)
+config RGBLED_WIDGET_LAYER_15_RGB
+    hex "Color to use for layer 15 (0xRRGGBB)"
+    default 0x000000
 
-config RGBLED_WIDGET_LAYER_16_COLOR
-    int "Color to use for layer 16"
-    range 0 7
-    default $(COLOR_BLACK)
+config RGBLED_WIDGET_LAYER_16_RGB
+    hex "Color to use for layer 16 (0xRRGGBB)"
+    default 0x000000
 
-config RGBLED_WIDGET_LAYER_17_COLOR
-    int "Color to use for layer 17"
-    range 0 7
-    default $(COLOR_BLACK)
+config RGBLED_WIDGET_LAYER_17_RGB
+    hex "Color to use for layer 17 (0xRRGGBB)"
+    default 0x000000
 
-config RGBLED_WIDGET_LAYER_18_COLOR
-    int "Color to use for layer 18"
-    range 0 7
-    default $(COLOR_BLACK)
+config RGBLED_WIDGET_LAYER_18_RGB
+    hex "Color to use for layer 18 (0xRRGGBB)"
+    default 0x000000
 
-config RGBLED_WIDGET_LAYER_19_COLOR
-    int "Color to use for layer 19"
-    range 0 7
-    default $(COLOR_BLACK)
+config RGBLED_WIDGET_LAYER_19_RGB
+    hex "Color to use for layer 19 (0xRRGGBB)"
+    default 0x000000
 
-config RGBLED_WIDGET_LAYER_20_COLOR
-    int "Color to use for layer 20"
-    range 0 7
-    default $(COLOR_BLACK)
+config RGBLED_WIDGET_LAYER_20_RGB
+    hex "Color to use for layer 20 (0xRRGGBB)"
+    default 0x000000
 
-config RGBLED_WIDGET_LAYER_21_COLOR
-    int "Color to use for layer 21"
-    range 0 7
-    default $(COLOR_BLACK)
+config RGBLED_WIDGET_LAYER_21_RGB
+    hex "Color to use for layer 21 (0xRRGGBB)"
+    default 0x000000
 
-config RGBLED_WIDGET_LAYER_22_COLOR
-    int "Color to use for layer 22"
-    range 0 7
-    default $(COLOR_BLACK)
+config RGBLED_WIDGET_LAYER_22_RGB
+    hex "Color to use for layer 22 (0xRRGGBB)"
+    default 0x000000
 
-config RGBLED_WIDGET_LAYER_23_COLOR
-    int "Color to use for layer 23"
-    range 0 7
-    default $(COLOR_BLACK)
+config RGBLED_WIDGET_LAYER_23_RGB
+    hex "Color to use for layer 23 (0xRRGGBB)"
+    default 0x000000
 
-config RGBLED_WIDGET_LAYER_24_COLOR
-    int "Color to use for layer 24"
-    range 0 7
-    default $(COLOR_BLACK)
+config RGBLED_WIDGET_LAYER_24_RGB
+    hex "Color to use for layer 24 (0xRRGGBB)"
+    default 0x000000
 
-config RGBLED_WIDGET_LAYER_25_COLOR
-    int "Color to use for layer 25"
-    range 0 7
-    default $(COLOR_BLACK)
+config RGBLED_WIDGET_LAYER_25_RGB
+    hex "Color to use for layer 25 (0xRRGGBB)"
+    default 0x000000
 
-config RGBLED_WIDGET_LAYER_26_COLOR
-    int "Color to use for layer 26"
-    range 0 7
-    default $(COLOR_BLACK)
+config RGBLED_WIDGET_LAYER_26_RGB
+    hex "Color to use for layer 26 (0xRRGGBB)"
+    default 0x000000
 
-config RGBLED_WIDGET_LAYER_27_COLOR
-    int "Color to use for layer 27"
-    range 0 7
-    default $(COLOR_BLACK)
+config RGBLED_WIDGET_LAYER_27_RGB
+    hex "Color to use for layer 27 (0xRRGGBB)"
+    default 0x000000
 
-config RGBLED_WIDGET_LAYER_28_COLOR
-    int "Color to use for layer 28"
-    range 0 7
-    default $(COLOR_BLACK)
+config RGBLED_WIDGET_LAYER_28_RGB
+    hex "Color to use for layer 28 (0xRRGGBB)"
+    default 0x000000
 
-config RGBLED_WIDGET_LAYER_29_COLOR
-    int "Color to use for layer 29"
-    range 0 7
-    default $(COLOR_BLACK)
+config RGBLED_WIDGET_LAYER_29_RGB
+    hex "Color to use for layer 29 (0xRRGGBB)"
+    default 0x000000
 
-config RGBLED_WIDGET_LAYER_30_COLOR
-    int "Color to use for layer 30"
-    range 0 7
-    default $(COLOR_BLACK)
+config RGBLED_WIDGET_LAYER_30_RGB
+    hex "Color to use for layer 30 (0xRRGGBB)"
+    default 0x000000
 
-config RGBLED_WIDGET_LAYER_31_COLOR
-    int "Color to use for layer 31"
-    range 0 7
-    default $(COLOR_BLACK)
+config RGBLED_WIDGET_LAYER_31_RGB
+    hex "Color to use for layer 31 (0xRRGGBB)"
+    default 0x000000
+
+# ---------------------------------------------------------------------------
+# K:04 fork additions
+# ---------------------------------------------------------------------------
+
+config RGBLED_WIDGET_BRIGHTNESS
+    int "Global brightness scale, percent"
+    range 1 100
+    default 40
+    help
+      Every colour is scaled by this before being written to the strip.
+      A bare WS2812 sitting under your palm at full duty is painfully
+      bright; start low and raise it if you cannot see the indicator.
+
+config RGBLED_WIDGET_GREEN_TRIM
+    int "Green channel trim, percent"
+    range 1 100
+    default 70
+    help
+      The green die in a WS2812 is perceptually brighter than the red one
+      at equal duty, so an even mix reads as green rather than yellow.
+      This scales green only, and is applied once for every colour source.
+      Tune it by eye: raise it if yellow looks orange, lower it if yellow
+      looks green.
+
+config RGBLED_WIDGET_BATTERY_GRADIENT
+    bool "Show battery level as a green-to-red gradient"
+    default y
+    help
+      Replaces the HIGH/MEDIUM/LOW threshold colours with a continuous hue
+      sweep: 100% is green, 50% is yellow, 0% is red. When disabled, the
+      BATTERY_RGB_HIGH/MEDIUM/LOW settings are used instead.
+
+config RGBLED_WIDGET_BATTERY_PULSE
+    bool "Periodically pulse a warning while the battery is low"
+    depends on ZMK_BATTERY_REPORTING
+    help
+      zmk_battery_state_changed only fires when the reported percentage
+      actually changes, which near the bottom of the range can be an hour
+      apart. This polls the cached level on a timer instead, so the warning
+      appears at a predictable cadence.
+
+if RGBLED_WIDGET_BATTERY_PULSE
+
+config RGBLED_WIDGET_BATTERY_PULSE_LEVEL
+    int "Pulse below this battery percentage"
+    range 1 100
+    default 10
+
+config RGBLED_WIDGET_BATTERY_PULSE_PERIOD_S
+    int "Seconds between pulse groups"
+    default 60
+
+config RGBLED_WIDGET_BATTERY_PULSE_COUNT
+    int "Number of blinks per group"
+    range 1 8
+    default 3
+
+config RGBLED_WIDGET_BATTERY_PULSE_MS
+    int "Duration of each pulse blink in ms"
+    default 100
+
+config RGBLED_WIDGET_BATTERY_PULSE_GAP_MS
+    int "Gap between blinks within a group, in ms"
+    default 150
+
+config RGBLED_WIDGET_BATTERY_PULSE_RGB
+    hex "Colour of the low battery pulse (0xRRGGBB)"
+    default 0xFF0000
+
+endif # RGBLED_WIDGET_BATTERY_PULSE
+
+config RGBLED_WIDGET_CONN_REMIND
+    bool "Periodically re-blink while the link is down"
+    help
+      Upstream indicates connectivity only on state-change events and once
+      at boot, so a keyboard that never connected shows nothing after the
+      initial blink. This adds a steady heartbeat until the link comes up.
+      On a central that means the BLE profile; on a peripheral it means the
+      link to the central.
+
+config RGBLED_WIDGET_CONN_REMIND_PERIOD_S
+    int "Seconds between reminder blinks"
+    depends on RGBLED_WIDGET_CONN_REMIND
+    default 5
+
+config RGBLED_WIDGET_LAYER_PUSH
+    bool "Mirror the layer colour onto split peripherals"
+    depends on RGBLED_WIDGET_SHOW_LAYER_COLORS && ZMK_SPLIT && ZMK_SPLIT_ROLE_CENTRAL
+    help
+      ZMK has no split message for layer state, so the central pushes the
+      resolved colour to each peripheral as a behavior invocation. param1
+      is a uint32_t, so the whole 0xRRGGBB value fits and the peripheral
+      needs no copy of the layer table. Requires the lyr_sync behavior node,
+      which this module declares.
 
 endif # RGBLED_WIDGET
 
 DT_COMPAT_ZMK_BEHAVIOR_RGBLED_WIDGET := zmk,behavior-rgbled-widget
+DT_COMPAT_ZMK_BEHAVIOR_RGBLED_SYNC := zmk,behavior-rgbled-sync
 
 config ZMK_BEHAVIOR_RGBLED_WIDGET
     bool
     default $(dt_compat_enabled,$(DT_COMPAT_ZMK_BEHAVIOR_RGBLED_WIDGET))
+
+# Driven by its own compatible, not by the widget behavior's. The lyr_sync node
+# is declared without /omit-if-no-ref/ (the central finds it by name over the
+# split link, so nothing in a keymap references it), which means this compatible
+# is enabled whenever the module is present.
+config ZMK_BEHAVIOR_RGBLED_SYNC
+    bool
+    depends on RGBLED_WIDGET
+    default $(dt_compat_enabled,$(DT_COMPAT_ZMK_BEHAVIOR_RGBLED_SYNC))

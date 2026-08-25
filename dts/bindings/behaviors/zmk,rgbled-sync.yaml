@@ -1,0 +1,11 @@
+# Copyright (c) 2026 The ZMK Contributors
+# SPDX-License-Identifier: MIT
+
+description: |
+  Internal behavior used to mirror the layer colour from a split central onto
+  its peripherals. Not meant to be placed in a keymap: it is invoked
+  programmatically over the split link, with param1 carrying a 0xRRGGBB value.
+
+compatible: "zmk,behavior-rgbled-sync"
+
+include: one_param.yaml

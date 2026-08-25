@@ -15,5 +15,16 @@
             #binding-cells = <0>;
             indicate-layer;
         };
+
+        /*
+         * NOTE: deliberately NOT /omit-if-no-ref/. This node is never named in
+         * a keymap -- the central looks it up by name over the split link -- so
+         * omit-if-no-ref would drop it from the devicetree and the lookup on
+         * the peripheral would return NULL.
+         */
+        lyr_sync: lyr_sync {
+            compatible = "zmk,behavior-rgbled-sync";
+            #binding-cells = <1>;
+        };
     };
 };
