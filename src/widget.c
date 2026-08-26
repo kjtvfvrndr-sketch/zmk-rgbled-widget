@@ -21,6 +21,7 @@
 #include <zmk/split/bluetooth/peripheral.h>
 
 #include <zmk/split/central.h>
+#include <zmk/workqueue.h>
 
 #include <zephyr/logging/log.h>
 
@@ -378,10 +379,25 @@ void set_layer_rgb_external(uint32_t rgb) {
 // Mirror the layer color onto every peripheral. param1 of a split behavior
 // invocation is a uint32_t, so the full 0xRRGGBB value fits and the peripheral
 // needs no copy of the layer table.
-static void push_layer_rgb(uint32_t rgb) {
+//
+// MUST NOT run inline in the layer-change listener. ZMK dispatches events
+// synchronously on the raising thread, so that listener executes in the key
+// processing path -- and split_bt_invoke_behavior_payload() calls
+// k_msgq_put(..., K_MSEC(100)) on a queue only
+// CONFIG_ZMK_SPLIT_BLE_CENTRAL_SPLIT_RUN_QUEUE_SIZE deep (default 5). A full
+// queue would therefore stall key handling for up to 100 ms per layer change.
+//
+// Deferring to ZMK's low priority work queue also coalesces bursts for free:
+// only the most recent colour is ever sent, since rapid layer changes just
+// overwrite pending_push_rgb before the single work item runs.
+//
+static uint32_t pending_push_rgb;
+static struct k_work push_layer_work;
+
+static void push_layer_rgb_work_cb(struct k_work *work) {
     struct zmk_behavior_binding binding = {
         .behavior_dev = "lyr_sync",
-        .param1 = rgb,
+        .param1 = pending_push_rgb,
         .param2 = 0,
     };
     struct zmk_behavior_binding_event event = {
@@ -396,6 +412,11 @@ static void push_layer_rgb(uint32_t rgb) {
             LOG_DBG("Could not push layer color to peripheral %d: %d", i, err);
         }
     }
+}
+
+static void push_layer_rgb(uint32_t rgb) {
+    pending_push_rgb = rgb;
+    k_work_submit_to_queue(zmk_workqueue_lowprio_work_q(), &push_layer_work);
 }
 #endif // LAYER_PUSH
 
@@ -527,6 +548,10 @@ extern void led_process_thread(void *d0, void *d1, void *d2) {
     ARG_UNUSED(d2);
 
     k_work_init_delayable(&indicate_connectivity_work, indicate_connectivity_cb);
+
+#if LAYER_PUSH
+    k_work_init(&push_layer_work, push_layer_rgb_work_cb);
+#endif
 
 #if SHOW_LAYER_CHANGE
     k_work_init_delayable(&layer_indicate_work, indicate_layer_cb);
