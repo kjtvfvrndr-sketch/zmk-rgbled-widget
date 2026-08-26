@@ -313,6 +313,17 @@ config RGBLED_WIDGET_BATTERY_PULSE_RGB
 
 endif # RGBLED_WIDGET_BATTERY_PULSE
 
+config RGBLED_WIDGET_OFF_ON_IDLE
+    bool "Turn the LED off when the keyboard goes idle"
+    default y
+    help
+      A lit WS2812 draws milliamps continuously -- far more than anything else
+      on an idle keyboard. Deep sleep already blanks it, but ZMK_IDLE_TIMEOUT
+      fires much sooner than ZMK_IDLE_SLEEP_TIMEOUT, so blanking on idle as
+      well cuts LED-on time dramatically while keeping the indicator visible
+      whenever you are actually typing. The colour is restored on the next
+      keypress.
+
 config RGBLED_WIDGET_CONN_REMIND
     bool "Periodically re-blink while the link is down"
     help

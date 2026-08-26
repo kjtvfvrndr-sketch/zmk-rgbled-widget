@@ -414,18 +414,9 @@ void update_layer_color(void) {
 }
 
 static int led_layer_color_listener_cb(const zmk_event_t *eh) {
-    struct zmk_activity_state_changed *ev = as_zmk_activity_state_changed(eh);
-
-    // check if this is indeed an activity state changed event
-    if (ev != NULL) {
-        switch (ev->state) {
-        case ZMK_ACTIVITY_SLEEP:
-            LOG_INF("Detected sleep activity state, turn off LED");
-            set_rgb_leds(0, 0);
-            break;
-        default: // not handling IDLE and ACTIVE yet
-            break;
-        }
+    // Activity transitions are handled by led_activity_listener below, which is
+    // compiled for both split roles. Ignore them here.
+    if (as_zmk_activity_state_changed(eh) != NULL) {
         return 0;
     }
 
@@ -441,6 +432,56 @@ ZMK_LISTENER(led_layer_color_listener, led_layer_color_listener_cb);
 ZMK_SUBSCRIPTION(led_layer_color_listener, zmk_layer_state_changed);
 ZMK_SUBSCRIPTION(led_layer_color_listener, zmk_activity_state_changed);
 #endif // SHOW_LAYER_COLORS
+
+/*
+ * Power handling, compiled for BOTH split roles.
+ *
+ * A WS2812 latches the last colour it was sent and keeps driving its die with
+ * no MCU involvement whatsoever. Entering System OFF therefore does NOT turn it
+ * off -- the LED stays lit until the battery is flat. It must be explicitly
+ * sent black before sleeping.
+ *
+ * This cannot live under SHOW_LAYER_COLORS: that gate is false on a split
+ * peripheral, yet the peripheral does hold a persistent colour pushed from the
+ * central via set_layer_rgb_external().
+ */
+static int led_activity_listener_cb(const zmk_event_t *eh) {
+    struct zmk_activity_state_changed *ev = as_zmk_activity_state_changed(eh);
+
+    if (ev == NULL) {
+        return 0;
+    }
+
+    switch (ev->state) {
+    case ZMK_ACTIVITY_SLEEP:
+        LOG_INF("Entering sleep, turning LED off");
+        set_rgb_leds(0, 0);
+        break;
+
+#if IS_ENABLED(CONFIG_RGBLED_WIDGET_OFF_ON_IDLE)
+    case ZMK_ACTIVITY_IDLE:
+        LOG_INF("Going idle, turning LED off");
+        set_rgb_leds(0, 0);
+        break;
+
+    case ZMK_ACTIVITY_ACTIVE:
+        // Restore whatever colour was current before we went dark. On a
+        // peripheral this is the colour last pushed by the central.
+        if (initialized) {
+            set_rgb_leds(led_layer_rgb, 0);
+        }
+        break;
+#endif
+
+    default:
+        break;
+    }
+
+    return 0;
+}
+
+ZMK_LISTENER(led_activity_listener, led_activity_listener_cb);
+ZMK_SUBSCRIPTION(led_activity_listener, zmk_activity_state_changed);
 
 #if !IS_ENABLED(CONFIG_ZMK_SPLIT) || IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
 void indicate_layer(void) {
