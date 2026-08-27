@@ -89,6 +89,10 @@ static inline uint8_t scale(uint16_t v) {
     return (uint8_t)((v * CONFIG_RGBLED_WIDGET_BRIGHTNESS) / 100);
 }
 
+#if CONFIG_RGBLED_WIDGET_BLANK_TIMEOUT_MS > 0
+static struct k_work_delayable blank_work;
+#endif
+
 // low-level method to control the LED
 static void set_rgb_leds(uint32_t rgb, uint32_t duration_ms) {
     // GREEN_TRIM compensates for the green die being perceptually brighter
@@ -107,11 +111,44 @@ static void set_rgb_leds(uint32_t rgb, uint32_t duration_ms) {
         k_sleep(K_MSEC(duration_ms));
     }
     led_current_rgb = rgb;
+
+#if CONFIG_RGBLED_WIDGET_BLANK_TIMEOUT_MS > 0
+    // Arm (or cancel) the blanking timer from the single place that ever
+    // touches the strip, so every path is covered: layer colours, colours
+    // pushed from the central, and the tail of a blink sequence.
+    if (rgb != 0) {
+        k_work_reschedule(&blank_work, K_MSEC(CONFIG_RGBLED_WIDGET_BLANK_TIMEOUT_MS));
+    } else {
+        k_work_cancel_delayable(&blank_work);
+    }
+#endif
 }
+
 
 // define message queue of blink work items, that will be processed by a
 // separate thread
 K_MSGQ_DEFINE(led_msgq, sizeof(struct blink_item), 16, 1);
+
+#if CONFIG_RGBLED_WIDGET_BLANK_TIMEOUT_MS > 0
+//
+// A split peripheral only ever sees ZMK_ACTIVITY_IDLE on the ACTIVE -> IDLE
+// transition (set_state() in app/src/activity.c returns early when the state
+// is unchanged). Type only on the central and the peripheral goes idle once,
+// gets blanked, and then every pushed layer colour lights it again with no
+// further idle event to ever turn it back off -- so it stays lit for hours.
+//
+// This timer is independent of the activity state and therefore covers that
+// case, on both roles.
+//
+static void blank_work_cb(struct k_work *work) {
+    ARG_UNUSED(work);
+
+    // Go through the queue rather than calling set_rgb_leds() here, so the
+    // strip is only ever driven from led_process_thread.
+    struct blink_item blank = {.rgb = 0, .duration_ms = 0};
+    k_msgq_put(&led_msgq, &blank, K_NO_WAIT);
+}
+#endif
 
 static void indicate_connectivity_internal(void) {
     struct blink_item blink = {.duration_ms = CONFIG_RGBLED_WIDGET_CONN_BLINK_MS};
@@ -392,9 +429,19 @@ void set_layer_rgb_external(uint32_t rgb) {
 // overwrite pending_push_rgb before the single work item runs.
 //
 static uint32_t pending_push_rgb;
-static struct k_work push_layer_work;
+static uint32_t last_pushed_rgb;
+static int64_t last_push_uptime;
+static struct k_work_delayable push_layer_work;
 
 static void push_layer_rgb_work_cb(struct k_work *work) {
+    ARG_UNUSED(work);
+
+    if (pending_push_rgb == last_pushed_rgb) {
+        return;
+    }
+    last_pushed_rgb = pending_push_rgb;
+    last_push_uptime = k_uptime_get();
+
     struct zmk_behavior_binding binding = {
         .behavior_dev = "lyr_sync",
         .param1 = pending_push_rgb,
@@ -414,9 +461,30 @@ static void push_layer_rgb_work_cb(struct k_work *work) {
     }
 }
 
+//
+// Leading-edge rate limit. An isolated layer change is pushed immediately; a
+// burst collapses into at most one write per MIN_INTERVAL_MS, and the final
+// colour always lands because pending_push_rgb is overwritten in place.
+//
+// This matters because bt_gatt_write_without_response() draws from the same
+// ACL TX pool (BT_L2CAP_TX_BUF_COUNT defaults to BT_BUF_ACL_TX_COUNT) that the
+// central uses for HID reports to the host. The split link drains slowly --
+// with the default ZMK_SPLIT_BLE_PREF_LATENCY of 30 the peripheral only
+// listens about 4 times a second -- so unthrottled pushes park buffers on that
+// connection and starve the trackball's reports to the host.
+//
+// An auto-activated mouse layer toggles on every trackball move/stop cycle, so
+// without this the push rate easily exceeds what the link can drain.
+//
 static void push_layer_rgb(uint32_t rgb) {
     pending_push_rgb = rgb;
-    k_work_submit_to_queue(zmk_workqueue_lowprio_work_q(), &push_layer_work);
+
+    int64_t since = k_uptime_get() - last_push_uptime;
+    k_timeout_t delay = (since >= CONFIG_RGBLED_WIDGET_LAYER_PUSH_MIN_INTERVAL_MS)
+                            ? K_NO_WAIT
+                            : K_MSEC(CONFIG_RGBLED_WIDGET_LAYER_PUSH_MIN_INTERVAL_MS - since);
+
+    k_work_reschedule_for_queue(zmk_workqueue_lowprio_work_q(), &push_layer_work, delay);
 }
 #endif // LAYER_PUSH
 
@@ -549,8 +617,12 @@ extern void led_process_thread(void *d0, void *d1, void *d2) {
 
     k_work_init_delayable(&indicate_connectivity_work, indicate_connectivity_cb);
 
+#if CONFIG_RGBLED_WIDGET_BLANK_TIMEOUT_MS > 0
+    k_work_init_delayable(&blank_work, blank_work_cb);
+#endif
+
 #if LAYER_PUSH
-    k_work_init(&push_layer_work, push_layer_rgb_work_cb);
+    k_work_init_delayable(&push_layer_work, push_layer_rgb_work_cb);
 #endif
 
 #if SHOW_LAYER_CHANGE

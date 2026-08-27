@@ -313,6 +313,23 @@ config RGBLED_WIDGET_BATTERY_PULSE_RGB
 
 endif # RGBLED_WIDGET_BATTERY_PULSE
 
+config RGBLED_WIDGET_BLANK_TIMEOUT_MS
+    int "Blank the LED this many milliseconds after it was last set (0 = never)"
+    default 800
+    help
+      Independent of ZMK's activity state. This matters on a split peripheral:
+      ZMK raises ZMK_ACTIVITY_IDLE only on the ACTIVE -> IDLE transition, so a
+      peripheral you never touch goes idle exactly once. Every layer colour the
+      central pushes after that lights the LED again with no further idle event
+      to turn it back off, leaving it lit for hours. This timer covers that.
+
+      Sub-second values turn the indicator into a flash on change rather than
+      a steady light, which matters a lot for battery: an auto-activated mouse
+      layer toggles constantly during trackball use, so a steady colour there
+      means the LED is lit essentially all the time. 800 ms is still easy to
+      catch out of the corner of your eye. Set 0 to keep the colour until the
+      next change.
+
 config RGBLED_WIDGET_OFF_ON_IDLE
     bool "Turn the LED off when the keyboard goes idle"
     default y
@@ -337,6 +354,19 @@ config RGBLED_WIDGET_CONN_REMIND_PERIOD_S
     int "Seconds between reminder blinks"
     depends on RGBLED_WIDGET_CONN_REMIND
     default 5
+
+config RGBLED_WIDGET_LAYER_PUSH_MIN_INTERVAL_MS
+    int "Minimum gap between colour pushes to peripherals"
+    depends on RGBLED_WIDGET_LAYER_PUSH
+    default 300
+    help
+      Leading edge rate limit: an isolated layer change goes out at once, a
+      burst collapses into one write per interval, and the last colour always
+      arrives. Writes to the split link draw from the same ACL TX pool the
+      central uses for HID reports to the host, and that link drains slowly
+      (with ZMK_SPLIT_BLE_PREF_LATENCY at its default of 30 the peripheral
+      listens roughly four times a second). Unthrottled pushes therefore park
+      buffers on the split connection and stall the trackball.
 
 config RGBLED_WIDGET_LAYER_PUSH
     bool "Mirror the layer colour onto split peripherals"
