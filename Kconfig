@@ -255,16 +255,36 @@ config RGBLED_WIDGET_BRIGHTNESS
       A bare WS2812 sitting under your palm at full duty is painfully
       bright; start low and raise it if you cannot see the indicator.
 
-config RGBLED_WIDGET_GREEN_TRIM
-    int "Green channel trim, percent"
-    range 1 100
-    default 70
+config RGBLED_WIDGET_GAIN_R
+    int "Red channel gain, percent of the value written in the colour"
+    range 0 100
+    default 100
     help
-      The green die in a WS2812 is perceptually brighter than the red one
-      at equal duty, so an even mix reads as green rather than yellow.
-      This scales green only, and is applied once for every colour source.
-      Tune it by eye: raise it if yellow looks orange, lower it if yellow
-      looks green.
+      100 leaves the channel exactly as the hex colour says, so 0xFFFFFF is
+      white and 0x808080 is grey. Lower it only to correct a die that reads too
+      bright on your particular LED -- any value below 100 means hex codes no
+      longer render literally, so prefer adjusting the colours themselves.
+
+config RGBLED_WIDGET_GAIN_G
+    int "Green channel gain, percent of the value written in the colour"
+    range 0 100
+    default 100
+    help
+      100 leaves the channel exactly as the hex colour says, so 0xFFFFFF is
+      white and 0x808080 is grey. Lower it only to correct a die that reads too
+      bright on your particular LED -- any value below 100 means hex codes no
+      longer render literally, so prefer adjusting the colours themselves.
+
+config RGBLED_WIDGET_GAIN_B
+    int "Blue channel gain, percent of the value written in the colour"
+    range 0 100
+    default 100
+    help
+      100 leaves the channel exactly as the hex colour says, so 0xFFFFFF is
+      white and 0x808080 is grey. Lower it only to correct a die that reads too
+      bright on your particular LED -- any value below 100 means hex codes no
+      longer render literally, so prefer adjusting the colours themselves.
+
 
 config RGBLED_WIDGET_BATTERY_GRADIENT
     bool "Show battery level as a green-to-red gradient"
@@ -314,8 +334,8 @@ config RGBLED_WIDGET_BATTERY_PULSE_RGB
 endif # RGBLED_WIDGET_BATTERY_PULSE
 
 config RGBLED_WIDGET_BLANK_TIMEOUT_MS
-    int "Blank the LED this many milliseconds after it was last set (0 = never)"
-    default 800
+    int "Default blanking time in ms, used by any layer that does not set its own (0 = never)"
+    default 1000
     help
       Independent of ZMK's activity state. This matters on a split peripheral:
       ZMK raises ZMK_ACTIVITY_IDLE only on the ACTIVE -> IDLE transition, so a
@@ -382,6 +402,134 @@ endif # RGBLED_WIDGET
 
 DT_COMPAT_ZMK_BEHAVIOR_RGBLED_WIDGET := zmk,behavior-rgbled-widget
 DT_COMPAT_ZMK_BEHAVIOR_RGBLED_SYNC := zmk,behavior-rgbled-sync
+
+config RGBLED_WIDGET_LAYER_0_MS
+    int "Blank the LED this many ms after layer 0 lights it (0 = never)"
+    default RGBLED_WIDGET_BLANK_TIMEOUT_MS
+
+config RGBLED_WIDGET_LAYER_1_MS
+    int "Blank the LED this many ms after layer 1 lights it (0 = never)"
+    default RGBLED_WIDGET_BLANK_TIMEOUT_MS
+
+config RGBLED_WIDGET_LAYER_2_MS
+    int "Blank the LED this many ms after layer 2 lights it (0 = never)"
+    default RGBLED_WIDGET_BLANK_TIMEOUT_MS
+
+config RGBLED_WIDGET_LAYER_3_MS
+    int "Blank the LED this many ms after layer 3 lights it (0 = never)"
+    default RGBLED_WIDGET_BLANK_TIMEOUT_MS
+
+config RGBLED_WIDGET_LAYER_4_MS
+    int "Blank the LED this many ms after layer 4 lights it (0 = never)"
+    default RGBLED_WIDGET_BLANK_TIMEOUT_MS
+
+config RGBLED_WIDGET_LAYER_5_MS
+    int "Blank the LED this many ms after layer 5 lights it (0 = never)"
+    default RGBLED_WIDGET_BLANK_TIMEOUT_MS
+
+config RGBLED_WIDGET_LAYER_6_MS
+    int "Blank the LED this many ms after layer 6 lights it (0 = never)"
+    default RGBLED_WIDGET_BLANK_TIMEOUT_MS
+
+config RGBLED_WIDGET_LAYER_7_MS
+    int "Blank the LED this many ms after layer 7 lights it (0 = never)"
+    default RGBLED_WIDGET_BLANK_TIMEOUT_MS
+
+config RGBLED_WIDGET_LAYER_8_MS
+    int "Blank the LED this many ms after layer 8 lights it (0 = never)"
+    default RGBLED_WIDGET_BLANK_TIMEOUT_MS
+
+config RGBLED_WIDGET_LAYER_9_MS
+    int "Blank the LED this many ms after layer 9 lights it (0 = never)"
+    default RGBLED_WIDGET_BLANK_TIMEOUT_MS
+
+config RGBLED_WIDGET_LAYER_10_MS
+    int "Blank the LED this many ms after layer 10 lights it (0 = never)"
+    default RGBLED_WIDGET_BLANK_TIMEOUT_MS
+
+config RGBLED_WIDGET_LAYER_11_MS
+    int "Blank the LED this many ms after layer 11 lights it (0 = never)"
+    default RGBLED_WIDGET_BLANK_TIMEOUT_MS
+
+config RGBLED_WIDGET_LAYER_12_MS
+    int "Blank the LED this many ms after layer 12 lights it (0 = never)"
+    default RGBLED_WIDGET_BLANK_TIMEOUT_MS
+
+config RGBLED_WIDGET_LAYER_13_MS
+    int "Blank the LED this many ms after layer 13 lights it (0 = never)"
+    default RGBLED_WIDGET_BLANK_TIMEOUT_MS
+
+config RGBLED_WIDGET_LAYER_14_MS
+    int "Blank the LED this many ms after layer 14 lights it (0 = never)"
+    default RGBLED_WIDGET_BLANK_TIMEOUT_MS
+
+config RGBLED_WIDGET_LAYER_15_MS
+    int "Blank the LED this many ms after layer 15 lights it (0 = never)"
+    default RGBLED_WIDGET_BLANK_TIMEOUT_MS
+
+config RGBLED_WIDGET_LAYER_16_MS
+    int "Blank the LED this many ms after layer 16 lights it (0 = never)"
+    default RGBLED_WIDGET_BLANK_TIMEOUT_MS
+
+config RGBLED_WIDGET_LAYER_17_MS
+    int "Blank the LED this many ms after layer 17 lights it (0 = never)"
+    default RGBLED_WIDGET_BLANK_TIMEOUT_MS
+
+config RGBLED_WIDGET_LAYER_18_MS
+    int "Blank the LED this many ms after layer 18 lights it (0 = never)"
+    default RGBLED_WIDGET_BLANK_TIMEOUT_MS
+
+config RGBLED_WIDGET_LAYER_19_MS
+    int "Blank the LED this many ms after layer 19 lights it (0 = never)"
+    default RGBLED_WIDGET_BLANK_TIMEOUT_MS
+
+config RGBLED_WIDGET_LAYER_20_MS
+    int "Blank the LED this many ms after layer 20 lights it (0 = never)"
+    default RGBLED_WIDGET_BLANK_TIMEOUT_MS
+
+config RGBLED_WIDGET_LAYER_21_MS
+    int "Blank the LED this many ms after layer 21 lights it (0 = never)"
+    default RGBLED_WIDGET_BLANK_TIMEOUT_MS
+
+config RGBLED_WIDGET_LAYER_22_MS
+    int "Blank the LED this many ms after layer 22 lights it (0 = never)"
+    default RGBLED_WIDGET_BLANK_TIMEOUT_MS
+
+config RGBLED_WIDGET_LAYER_23_MS
+    int "Blank the LED this many ms after layer 23 lights it (0 = never)"
+    default RGBLED_WIDGET_BLANK_TIMEOUT_MS
+
+config RGBLED_WIDGET_LAYER_24_MS
+    int "Blank the LED this many ms after layer 24 lights it (0 = never)"
+    default RGBLED_WIDGET_BLANK_TIMEOUT_MS
+
+config RGBLED_WIDGET_LAYER_25_MS
+    int "Blank the LED this many ms after layer 25 lights it (0 = never)"
+    default RGBLED_WIDGET_BLANK_TIMEOUT_MS
+
+config RGBLED_WIDGET_LAYER_26_MS
+    int "Blank the LED this many ms after layer 26 lights it (0 = never)"
+    default RGBLED_WIDGET_BLANK_TIMEOUT_MS
+
+config RGBLED_WIDGET_LAYER_27_MS
+    int "Blank the LED this many ms after layer 27 lights it (0 = never)"
+    default RGBLED_WIDGET_BLANK_TIMEOUT_MS
+
+config RGBLED_WIDGET_LAYER_28_MS
+    int "Blank the LED this many ms after layer 28 lights it (0 = never)"
+    default RGBLED_WIDGET_BLANK_TIMEOUT_MS
+
+config RGBLED_WIDGET_LAYER_29_MS
+    int "Blank the LED this many ms after layer 29 lights it (0 = never)"
+    default RGBLED_WIDGET_BLANK_TIMEOUT_MS
+
+config RGBLED_WIDGET_LAYER_30_MS
+    int "Blank the LED this many ms after layer 30 lights it (0 = never)"
+    default RGBLED_WIDGET_BLANK_TIMEOUT_MS
+
+config RGBLED_WIDGET_LAYER_31_MS
+    int "Blank the LED this many ms after layer 31 lights it (0 = never)"
+    default RGBLED_WIDGET_BLANK_TIMEOUT_MS
 
 config ZMK_BEHAVIOR_RGBLED_WIDGET
     bool

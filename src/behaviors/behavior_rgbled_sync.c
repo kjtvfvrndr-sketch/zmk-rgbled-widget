@@ -23,8 +23,9 @@ static int on_keymap_binding_pressed(struct zmk_behavior_binding *binding,
 #if IS_ENABLED(CONFIG_RGBLED_WIDGET)
     // param1 carries the full 0xRRGGBB value pushed by the central, so this
     // side needs no copy of the layer colour table.
-    LOG_DBG("Received layer colour #%06X from central", binding->param1);
-    set_layer_rgb_external(binding->param1);
+    LOG_DBG("Received layer colour #%06X (blank after %dms) from central", binding->param1,
+            binding->param2);
+    set_layer_rgb_external(binding->param1, binding->param2);
 #endif
     return ZMK_BEHAVIOR_OPAQUE;
 }

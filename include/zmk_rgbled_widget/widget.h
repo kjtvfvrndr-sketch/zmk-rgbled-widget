@@ -24,4 +24,4 @@ void indicate_layer(void);
 #endif
 
 // Applied on a peripheral when the central pushes a new layer colour.
-void set_layer_rgb_external(uint32_t rgb);
+void set_layer_rgb_external(uint32_t rgb, uint32_t blank_ms);

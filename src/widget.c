@@ -58,6 +58,41 @@ static const uint32_t layer_rgb[] = {
     CONFIG_RGBLED_WIDGET_LAYER_28_RGB, CONFIG_RGBLED_WIDGET_LAYER_29_RGB,
     CONFIG_RGBLED_WIDGET_LAYER_30_RGB, CONFIG_RGBLED_WIDGET_LAYER_31_RGB,
 };
+
+static const uint32_t layer_ms[] = {
+    CONFIG_RGBLED_WIDGET_LAYER_0_MS,
+    CONFIG_RGBLED_WIDGET_LAYER_1_MS,
+    CONFIG_RGBLED_WIDGET_LAYER_2_MS,
+    CONFIG_RGBLED_WIDGET_LAYER_3_MS,
+    CONFIG_RGBLED_WIDGET_LAYER_4_MS,
+    CONFIG_RGBLED_WIDGET_LAYER_5_MS,
+    CONFIG_RGBLED_WIDGET_LAYER_6_MS,
+    CONFIG_RGBLED_WIDGET_LAYER_7_MS,
+    CONFIG_RGBLED_WIDGET_LAYER_8_MS,
+    CONFIG_RGBLED_WIDGET_LAYER_9_MS,
+    CONFIG_RGBLED_WIDGET_LAYER_10_MS,
+    CONFIG_RGBLED_WIDGET_LAYER_11_MS,
+    CONFIG_RGBLED_WIDGET_LAYER_12_MS,
+    CONFIG_RGBLED_WIDGET_LAYER_13_MS,
+    CONFIG_RGBLED_WIDGET_LAYER_14_MS,
+    CONFIG_RGBLED_WIDGET_LAYER_15_MS,
+    CONFIG_RGBLED_WIDGET_LAYER_16_MS,
+    CONFIG_RGBLED_WIDGET_LAYER_17_MS,
+    CONFIG_RGBLED_WIDGET_LAYER_18_MS,
+    CONFIG_RGBLED_WIDGET_LAYER_19_MS,
+    CONFIG_RGBLED_WIDGET_LAYER_20_MS,
+    CONFIG_RGBLED_WIDGET_LAYER_21_MS,
+    CONFIG_RGBLED_WIDGET_LAYER_22_MS,
+    CONFIG_RGBLED_WIDGET_LAYER_23_MS,
+    CONFIG_RGBLED_WIDGET_LAYER_24_MS,
+    CONFIG_RGBLED_WIDGET_LAYER_25_MS,
+    CONFIG_RGBLED_WIDGET_LAYER_26_MS,
+    CONFIG_RGBLED_WIDGET_LAYER_27_MS,
+    CONFIG_RGBLED_WIDGET_LAYER_28_MS,
+    CONFIG_RGBLED_WIDGET_LAYER_29_MS,
+    CONFIG_RGBLED_WIDGET_LAYER_30_MS,
+    CONFIG_RGBLED_WIDGET_LAYER_31_MS,
+};
 #endif
 
 // log shorthands
@@ -76,6 +111,9 @@ struct blink_item {
     uint32_t rgb;
     uint32_t duration_ms;
     uint32_t sleep_ms;
+    // Only meaningful for a persistent item (duration_ms == 0): how long the
+    // colour stays before the blanking timer clears it. 0 means never blank.
+    uint32_t blank_ms;
 };
 
 // flag to indicate whether the initial boot up sequence is complete
@@ -83,6 +121,14 @@ static bool initialized = false;
 
 // track current color for persistent indicators (layer color)
 uint32_t led_current_rgb = 0;
+
+// The colour the strip returns to after a blink, and how long it may stay.
+// Deliberately NOT the same variable as led_layer_rgb: once the blanking timer
+// has fired, the resting colour is black while led_layer_rgb still remembers
+// what the layer wants. Without this split, a battery pulse arriving after the
+// blank would flash red and the stale layer colour alternately.
+static uint32_t led_rest_rgb = 0;
+static uint32_t led_rest_blank_ms = CONFIG_RGBLED_WIDGET_BLANK_TIMEOUT_MS;
 
 // global brightness scaling, 0..100
 static inline uint8_t scale(uint16_t v) {
@@ -96,10 +142,14 @@ static struct k_work_delayable blank_work;
 // low-level method to control the LED
 static void set_rgb_leds(uint32_t rgb, uint32_t duration_ms) {
     // GREEN_TRIM compensates for the green die being perceptually brighter
+    // Per-channel gain, applied as a percentage of the nominal value: 100
+    // leaves the channel exactly as written in the hex colour. This is what
+    // makes 0xFFFFFF actually render as white -- an asymmetric gain silently
+    // turns every hex code into something other than what it says.
     struct led_rgb px = {
-        .r = scale((rgb >> 16) & 0xFF),
-        .g = scale((((rgb >> 8) & 0xFF) * CONFIG_RGBLED_WIDGET_GREEN_TRIM) / 100),
-        .b = scale(rgb & 0xFF),
+        .r = scale((((rgb >> 16) & 0xFF) * CONFIG_RGBLED_WIDGET_GAIN_R) / 100),
+        .g = scale((((rgb >> 8) & 0xFF) * CONFIG_RGBLED_WIDGET_GAIN_G) / 100),
+        .b = scale(((rgb & 0xFF) * CONFIG_RGBLED_WIDGET_GAIN_B) / 100),
     };
 
     int err = led_strip_update_rgb(led_dev, &px, 1);
@@ -116,8 +166,8 @@ static void set_rgb_leds(uint32_t rgb, uint32_t duration_ms) {
     // Arm (or cancel) the blanking timer from the single place that ever
     // touches the strip, so every path is covered: layer colours, colours
     // pushed from the central, and the tail of a blink sequence.
-    if (rgb != 0) {
-        k_work_reschedule(&blank_work, K_MSEC(CONFIG_RGBLED_WIDGET_BLANK_TIMEOUT_MS));
+    if (rgb != 0 && led_rest_blank_ms > 0) {
+        k_work_reschedule(&blank_work, K_MSEC(led_rest_blank_ms));
     } else {
         k_work_cancel_delayable(&blank_work);
     }
@@ -145,8 +195,14 @@ static void blank_work_cb(struct k_work *work) {
 
     // Go through the queue rather than calling set_rgb_leds() here, so the
     // strip is only ever driven from led_process_thread.
-    struct blink_item blank = {.rgb = 0, .duration_ms = 0};
-    k_msgq_put(&led_msgq, &blank, K_NO_WAIT);
+    struct blink_item blank = {.rgb = 0, .duration_ms = 0, .blank_ms = 0};
+
+    // If the queue is momentarily full (a battery pulse burst, say), retry
+    // shortly rather than dropping the blank: the timer has already fired and
+    // nothing else would re-arm it, so a lost blank leaves the LED lit for good.
+    if (k_msgq_put(&led_msgq, &blank, K_NO_WAIT) != 0) {
+        k_work_reschedule(&blank_work, K_MSEC(200));
+    }
 }
 #endif
 
@@ -396,17 +452,25 @@ static void batt_pulse_cb(struct k_work *work) {
 
 uint32_t led_layer_rgb = 0;
 
+// Dedup partner for led_layer_rgb: what the layer last asked for. Must NOT be
+// confused with led_rest_blank_ms, which is runtime state zeroed by the
+// blanking timer, idle and sleep -- comparing against that would re-trigger on
+// every layer change once the LED had been blanked, even for an unchanged
+// colour.
+static uint32_t led_layer_ms = CONFIG_RGBLED_WIDGET_BLANK_TIMEOUT_MS;
+
 // Applied on a peripheral when the central pushes a new layer colour. Defined
 // unconditionally: a peripheral has SHOW_LAYER_COLORS == 0 (it cannot resolve
 // layer state itself) yet still needs to display what it is told.
-void set_layer_rgb_external(uint32_t rgb) {
-    if (led_layer_rgb == rgb) {
+void set_layer_rgb_external(uint32_t rgb, uint32_t blank_ms) {
+    if (led_layer_rgb == rgb && led_layer_ms == blank_ms) {
         return;
     }
     led_layer_rgb = rgb;
+    led_layer_ms = blank_ms;
 
-    struct blink_item color = {.rgb = rgb};
-    LOG_INF("Applying pushed layer colour #%06X", rgb);
+    struct blink_item color = {.rgb = rgb, .blank_ms = blank_ms};
+    LOG_INF("Applying pushed layer colour #%06X, blank after %dms", rgb, blank_ms);
     k_msgq_put(&led_msgq, &color, K_NO_WAIT);
 }
 
@@ -429,23 +493,28 @@ void set_layer_rgb_external(uint32_t rgb) {
 // overwrite pending_push_rgb before the single work item runs.
 //
 static uint32_t pending_push_rgb;
+static uint32_t pending_push_ms;
 static uint32_t last_pushed_rgb;
+static uint32_t last_pushed_ms;
 static int64_t last_push_uptime;
 static struct k_work_delayable push_layer_work;
 
 static void push_layer_rgb_work_cb(struct k_work *work) {
     ARG_UNUSED(work);
 
-    if (pending_push_rgb == last_pushed_rgb) {
+    if (pending_push_rgb == last_pushed_rgb && pending_push_ms == last_pushed_ms) {
         return;
     }
     last_pushed_rgb = pending_push_rgb;
+    last_pushed_ms = pending_push_ms;
     last_push_uptime = k_uptime_get();
 
     struct zmk_behavior_binding binding = {
         .behavior_dev = "lyr_sync",
         .param1 = pending_push_rgb,
-        .param2 = 0,
+        // param2 carries the blanking time, so the peripheral needs no copy of
+        // the layer table -- it is told both what to show and for how long.
+        .param2 = pending_push_ms,
     };
     struct zmk_behavior_binding_event event = {
         .layer = 0,
@@ -476,8 +545,9 @@ static void push_layer_rgb_work_cb(struct k_work *work) {
 // An auto-activated mouse layer toggles on every trackball move/stop cycle, so
 // without this the push rate easily exceeds what the link can drain.
 //
-static void push_layer_rgb(uint32_t rgb) {
+static void push_layer_rgb(uint32_t rgb, uint32_t blank_ms) {
     pending_push_rgb = rgb;
+    pending_push_ms = blank_ms;
 
     int64_t since = k_uptime_get() - last_push_uptime;
     k_timeout_t delay = (since >= CONFIG_RGBLED_WIDGET_LAYER_PUSH_MIN_INTERVAL_MS)
@@ -491,13 +561,15 @@ static void push_layer_rgb(uint32_t rgb) {
 void update_layer_color(void) {
     uint8_t index = zmk_keymap_highest_layer_active();
 
-    if (led_layer_rgb != layer_rgb[index]) {
+    if (led_layer_rgb != layer_rgb[index] || led_layer_ms != layer_ms[index]) {
         led_layer_rgb = layer_rgb[index];
-        struct blink_item color = {.rgb = led_layer_rgb};
-        LOG_INF("Setting layer color to #%06X for layer %d", led_layer_rgb, index);
+        led_layer_ms = layer_ms[index];
+        struct blink_item color = {.rgb = led_layer_rgb, .blank_ms = layer_ms[index]};
+        LOG_INF("Setting layer color to #%06X for layer %d, blank after %dms", led_layer_rgb,
+                index, layer_ms[index]);
         k_msgq_put(&led_msgq, &color, K_NO_WAIT);
 #if LAYER_PUSH
-        push_layer_rgb(led_layer_rgb);
+        push_layer_rgb(led_layer_rgb, layer_ms[index]);
 #endif
     }
 }
@@ -544,20 +616,28 @@ static int led_activity_listener_cb(const zmk_event_t *eh) {
     switch (ev->state) {
     case ZMK_ACTIVITY_SLEEP:
         LOG_INF("Entering sleep, turning LED off");
+        led_rest_rgb = 0;
+        led_rest_blank_ms = 0;
         set_rgb_leds(0, 0);
         break;
 
 #if IS_ENABLED(CONFIG_RGBLED_WIDGET_OFF_ON_IDLE)
     case ZMK_ACTIVITY_IDLE:
         LOG_INF("Going idle, turning LED off");
+        led_rest_rgb = 0;
+        led_rest_blank_ms = 0;
         set_rgb_leds(0, 0);
         break;
 
     case ZMK_ACTIVITY_ACTIVE:
-        // Restore whatever colour was current before we went dark. On a
-        // peripheral this is the colour last pushed by the central.
-        if (initialized) {
-            set_rgb_leds(led_layer_rgb, 0);
+        // Restore what the layer wants, not led_rest_rgb -- the latter was
+        // zeroed on the way into idle, so restoring from it would be a no-op.
+        // On a peripheral led_layer_rgb holds the colour last pushed by the
+        // central. Goes through the queue so the strip is only ever driven
+        // from led_process_thread.
+        if (initialized && led_layer_rgb != 0) {
+            struct blink_item restore = {.rgb = led_layer_rgb, .blank_ms = led_layer_ms};
+            k_msgq_put(&led_msgq, &restore, K_NO_WAIT);
         }
         break;
 #endif
@@ -652,15 +732,20 @@ extern void led_process_thread(void *d0, void *d1, void *d2) {
                 set_rgb_leds(0, CONFIG_RGBLED_WIDGET_INTERVAL_MS);
             }
             set_rgb_leds(blink.rgb, blink.duration_ms);
-            if (blink.rgb == led_layer_rgb && blink.rgb > 0) {
+            if (blink.rgb == led_rest_rgb && blink.rgb > 0) {
                 set_rgb_leds(0, CONFIG_RGBLED_WIDGET_INTERVAL_MS);
             }
-            // wait interval before processing another blink
-            set_rgb_leds(led_layer_rgb,
+            // Return to the resting colour, which is black once the blanking
+            // timer has run. A pulse arriving after that therefore blinks
+            // against black instead of against a stale layer colour.
+            set_rgb_leds(led_rest_rgb,
                          blink.sleep_ms > 0 ? blink.sleep_ms : CONFIG_RGBLED_WIDGET_INTERVAL_MS);
 
         } else {
-            LOG_DBG("Got a layer color item from msgq, color #%06X", blink.rgb);
+            LOG_DBG("Got a persistent color item from msgq, color #%06X, blank after %dms",
+                    blink.rgb, blink.blank_ms);
+            led_rest_rgb = blink.rgb;
+            led_rest_blank_ms = blink.blank_ms;
             set_rgb_leds(blink.rgb, 0);
         }
     }
