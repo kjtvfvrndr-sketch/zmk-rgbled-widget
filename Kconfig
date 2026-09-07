@@ -398,11 +398,6 @@ config RGBLED_WIDGET_LAYER_PUSH
       needs no copy of the layer table. Requires the lyr_sync behavior node,
       which this module declares.
 
-endif # RGBLED_WIDGET
-
-DT_COMPAT_ZMK_BEHAVIOR_RGBLED_WIDGET := zmk,behavior-rgbled-widget
-DT_COMPAT_ZMK_BEHAVIOR_RGBLED_SYNC := zmk,behavior-rgbled-sync
-
 config RGBLED_WIDGET_LAYER_0_MS
     int "Blank the LED this many ms after layer 0 lights it (0 = never)"
     default RGBLED_WIDGET_BLANK_TIMEOUT_MS
@@ -530,6 +525,11 @@ config RGBLED_WIDGET_LAYER_30_MS
 config RGBLED_WIDGET_LAYER_31_MS
     int "Blank the LED this many ms after layer 31 lights it (0 = never)"
     default RGBLED_WIDGET_BLANK_TIMEOUT_MS
+
+endif # RGBLED_WIDGET
+
+DT_COMPAT_ZMK_BEHAVIOR_RGBLED_WIDGET := zmk,behavior-rgbled-widget
+DT_COMPAT_ZMK_BEHAVIOR_RGBLED_SYNC := zmk,behavior-rgbled-sync
 
 config ZMK_BEHAVIOR_RGBLED_WIDGET
     bool
