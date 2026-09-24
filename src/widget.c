@@ -27,7 +27,7 @@
 
 #include <zmk_rgbled_widget/widget.h>
 
-LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
+LOG_MODULE_REGISTER(rgbled_widget, CONFIG_RGBLED_WIDGET_LOG_LEVEL);
 
 BUILD_ASSERT(DT_NODE_EXISTS(DT_ALIAS(led_strip)),
              "An alias 'led-strip' is not found for RGBLED_WIDGET");
@@ -470,7 +470,8 @@ void set_layer_rgb_external(uint32_t rgb, uint32_t blank_ms) {
     led_layer_ms = blank_ms;
 
     struct blink_item color = {.rgb = rgb, .blank_ms = blank_ms};
-    LOG_INF("Applying pushed layer colour #%06X, blank after %dms", rgb, blank_ms);
+    /* DBG: arrives with every layer change on the central. */
+    LOG_DBG("Applying pushed layer colour #%06X, blank after %dms", rgb, blank_ms);
     k_msgq_put(&led_msgq, &color, K_NO_WAIT);
 }
 
@@ -565,7 +566,9 @@ void update_layer_color(void) {
         led_layer_rgb = layer_rgb[index];
         led_layer_ms = layer_ms[index];
         struct blink_item color = {.rgb = led_layer_rgb, .blank_ms = layer_ms[index]};
-        LOG_INF("Setting layer color to #%06X for layer %d, blank after %dms", led_layer_rgb,
+        /* DBG: fires on every layer change, and the auto-mouse layer changes
+           all the time. */
+        LOG_DBG("Setting layer color to #%06X for layer %d, blank after %dms", led_layer_rgb,
                 index, layer_ms[index]);
         k_msgq_put(&led_msgq, &color, K_NO_WAIT);
 #if LAYER_PUSH
@@ -660,7 +663,8 @@ void indicate_layer(void) {
                                             .sleep_ms = CONFIG_RGBLED_WIDGET_LAYER_BLINK_MS};
     static const struct blink_item last_blink = {.duration_ms = CONFIG_RGBLED_WIDGET_LAYER_BLINK_MS,
                                                  .rgb = CONFIG_RGBLED_WIDGET_LAYER_RGB};
-    LOG_INF("Blinking %d times #%06X for layer change", index,
+    /* DBG for the same reason: one line per layer change. */
+    LOG_DBG("Blinking %d times #%06X for layer change", index,
             CONFIG_RGBLED_WIDGET_LAYER_RGB);
 
     for (int i = 0; i < index; i++) {

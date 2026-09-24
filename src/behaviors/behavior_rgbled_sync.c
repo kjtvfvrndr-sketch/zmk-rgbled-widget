@@ -14,7 +14,7 @@
 
 #include <zmk_rgbled_widget/widget.h>
 
-LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
+LOG_MODULE_DECLARE(rgbled_widget, CONFIG_RGBLED_WIDGET_LOG_LEVEL);
 
 static int behavior_rgb_sync_init(const struct device *dev) { return 0; }
 

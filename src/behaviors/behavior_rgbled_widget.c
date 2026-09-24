@@ -8,7 +8,9 @@
 
 #include <zmk_rgbled_widget/widget.h>
 
-LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
+/* No log module on purpose: nothing here logs, and unlike the sync behaviour
+   this file is built whenever its devicetree node is enabled -- also without
+   CONFIG_RGBLED_WIDGET, where the widget's log level symbol does not exist. */
 
 struct behavior_rgb_wdg_config {
     bool indicate_battery;

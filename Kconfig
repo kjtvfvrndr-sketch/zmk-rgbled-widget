@@ -526,6 +526,15 @@ config RGBLED_WIDGET_LAYER_31_MS
     int "Blank the LED this many ms after layer 31 lights it (0 = never)"
     default RGBLED_WIDGET_BLANK_TIMEOUT_MS
 
+# The widget logs under its own module rather than ZMK's, so its output can
+# be turned down without touching anything else. Default is INF: start-up,
+# connection, battery and idle events. _WRN keeps only errors; _DBG adds the
+# per-layer-change lines, which arrive every time the auto-mouse layer
+# toggles.
+module = RGBLED_WIDGET
+module-str = rgbled_widget
+source "${ZEPHYR_BASE}/subsys/logging/Kconfig.template.log_config"
+
 endif # RGBLED_WIDGET
 
 DT_COMPAT_ZMK_BEHAVIOR_RGBLED_WIDGET := zmk,behavior-rgbled-widget
