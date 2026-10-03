@@ -15,9 +15,7 @@
 void indicate_battery(void);
 #endif
 
-#if IS_ENABLED(CONFIG_ZMK_BLE)
 void indicate_connectivity(void);
-#endif
 
 #if !IS_ENABLED(CONFIG_ZMK_SPLIT) || IS_ENABLED(CONFIG_ZMK_SPLIT_ROLE_CENTRAL)
 void indicate_layer(void);
@@ -25,3 +23,9 @@ void indicate_layer(void);
 
 // Applied on a peripheral when the central pushes a new layer colour.
 void set_layer_rgb_external(uint32_t rgb, uint32_t blank_ms);
+
+#if LAYER_PUSH
+// Central: show this colour on every peripheral's LED
+// (src/layer_push_to_peripherals.c). Returns at once; the write follows.
+void rgbled_widget_push_layer_color_to_peripherals(uint32_t rgb, uint32_t blank_ms);
+#endif

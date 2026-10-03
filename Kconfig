@@ -36,26 +36,39 @@ config RGBLED_WIDGET_BATTERY_BLINK_MS
 
 config RGBLED_WIDGET_BATTERY_LEVEL_HIGH
     int "High battery level percentage"
+    range 2 100
     default 80
+    help
+      At and above this level the battery shows BATTERY_RGB_HIGH. With
+      BATTERY_GRADIENT it is where the gradient is fully that colour.
 
 config RGBLED_WIDGET_BATTERY_LEVEL_LOW
     int "Low battery level percentage"
-    default 20
+    range 1 99
+    default 10
+    help
+      At and below this level the battery shows BATTERY_RGB_LOW, with and
+      without BATTERY_GRADIENT. Must be below BATTERY_LEVEL_HIGH. BATTERY_PULSE starts here too,
+      unless BATTERY_PULSE_LEVEL is set.
 
 config RGBLED_WIDGET_BATTERY_LEVEL_CRITICAL
-    int "Critical battery level percentage"
-    default 5
+    int "Critical battery level percentage (0 = off)"
+    default 0
+    help
+      One BATTERY_RGB_CRITICAL blink every time ZMK reports a new battery
+      level at or below this. Off by default: BATTERY_PULSE warns of a low
+      battery at a steady cadence instead.
 
 config RGBLED_WIDGET_BATTERY_RGB_HIGH
-    hex "Color for high battery level (above LEVEL_HIGH) (0xRRGGBB)"
+    hex "Color for high battery level (LEVEL_HIGH and above) (0xRRGGBB)"
     default 0x00FF00
 
 config RGBLED_WIDGET_BATTERY_RGB_MEDIUM
-    hex "Color for medium battery level (between LEVEL_LOW and LEVEL_HIGH) (0xRRGGBB)"
+    hex "Color for medium battery level (between LEVEL_LOW and LEVEL_HIGH; the gradient's midpoint) (0xRRGGBB)"
     default 0xFFFF00
 
 config RGBLED_WIDGET_BATTERY_RGB_LOW
-    hex "Color for low battery level (below LEVEL_LOW) (0xRRGGBB)"
+    hex "Color for low battery level (LEVEL_LOW and below) (0xRRGGBB)"
     default 0xFF0000
 
 config RGBLED_WIDGET_BATTERY_RGB_CRITICAL
@@ -68,31 +81,40 @@ config RGBLED_WIDGET_BATTERY_RGB_MISSING
 
 # Connectivity indicator settings
 config RGBLED_WIDGET_CONN_BLINK_MS
-    int "Duration of BLE connection status blink in ms"
-    default RGBLED_WIDGET_OUTPUT_BLINK_MS
+    int "Duration of a connection status blink in ms"
+    default 1000
+    help
+      The blink on a connection event: connected, lost, a profile switched
+      or opened for pairing, and the status at boot. The reminder while the
+      link is down has its own, CONN_REMIND_BLINK_MS.
 
 config RGBLED_WIDGET_CONN_SHOW_USB
     bool "Show USB indicator instead of BLE status if it has priority"
-
-config RGBLED_WIDGET_OUTPUT_BLINK_MS  # DEPRECATED, do not use
-    int
-    default 1000
+    default y
+    help
+      Blink CONN_RGB_USB when the keys go to USB, and the BLE status when
+      they go back: the indicator follows where the keys go, not the
+      power. ZMK sends them over USB once a computer has taken the USB
+      connection, and over Bluetooth while a connected profile is the
+      preferred output (&out). A charger changes nothing, nor does a cable
+      while the keys stay on Bluetooth. Off: on USB the connection blinks
+      show the BLE profile, and a change of output does not blink.
 
 config RGBLED_WIDGET_CONN_RGB_CONNECTED
     hex "Color for connected BLE connection status (0xRRGGBB)"
     default 0x0000FF
 
 config RGBLED_WIDGET_CONN_RGB_ADVERTISING
-    hex "Color for advertising BLE connection status (0xRRGGBB)"
-    default 0xFFFF00
+    hex "Color for a profile open for pairing (0xRRGGBB)"
+    default 0x00FFFF
 
 config RGBLED_WIDGET_CONN_RGB_DISCONNECTED
-    hex "Color for disconnected BLE connection status (0xRRGGBB)"
-    default 0xFF0000
+    hex "Color for a paired profile whose host is not connected, or a peripheral without its central (0xRRGGBB)"
+    default 0x00FFFF
 
 config RGBLED_WIDGET_CONN_RGB_USB
     hex "Color for USB endpoint active (0xRRGGBB)"
-    default 0x00FFFF
+    default 0xFFFFFF
 
 # Layer indicator settings
 config RGBLED_WIDGET_SHOW_LAYER_CHANGE
@@ -249,7 +271,7 @@ config RGBLED_WIDGET_LAYER_31_RGB
 config RGBLED_WIDGET_BRIGHTNESS
     int "Global brightness scale, percent"
     range 1 100
-    default 40
+    default 30
     help
       Every colour is scaled by this before being written to the strip.
       A bare WS2812 sitting under your palm at full duty is painfully
@@ -287,16 +309,22 @@ config RGBLED_WIDGET_GAIN_B
 
 
 config RGBLED_WIDGET_BATTERY_GRADIENT
-    bool "Show battery level as a green-to-red gradient"
+    bool "Show battery level as a gradient between the HIGH, MEDIUM and LOW colours"
     default y
     help
-      Replaces the HIGH/MEDIUM/LOW threshold colours with a continuous hue
-      sweep: 100% is green, 50% is yellow, 0% is red. When disabled, the
-      BATTERY_RGB_HIGH/MEDIUM/LOW settings are used instead.
+      Blends the threshold colours instead of jumping between them:
+      BATTERY_RGB_HIGH at BATTERY_LEVEL_HIGH and above, BATTERY_RGB_LOW at
+      BATTERY_LEVEL_LOW and below, BATTERY_RGB_MEDIUM halfway between the
+      two levels, and a smooth blend in between. The blend keeps the
+      brightness of its two ends, so it does not dim halfway between two
+      colours that sit far apart. With the defaults: green from 80%,
+      yellow at 45%, red at 10%. When disabled, the three colours switch
+      at the two levels.
 
 config RGBLED_WIDGET_BATTERY_PULSE
     bool "Periodically pulse a warning while the battery is low"
     depends on ZMK_BATTERY_REPORTING
+    default y
     help
       zmk_battery_state_changed only fires when the reported percentage
       actually changes, which near the bottom of the range can be an hour
@@ -306,9 +334,12 @@ config RGBLED_WIDGET_BATTERY_PULSE
 if RGBLED_WIDGET_BATTERY_PULSE
 
 config RGBLED_WIDGET_BATTERY_PULSE_LEVEL
-    int "Pulse below this battery percentage"
+    int "Pulse at and below this battery percentage"
     range 1 100
-    default 10
+    default RGBLED_WIDGET_BATTERY_LEVEL_LOW
+    help
+      BATTERY_LEVEL_LOW by default: the pulse starts where the battery
+      colour has become BATTERY_RGB_LOW.
 
 config RGBLED_WIDGET_BATTERY_PULSE_PERIOD_S
     int "Seconds between pulse groups"
@@ -332,6 +363,38 @@ config RGBLED_WIDGET_BATTERY_PULSE_RGB
     default 0xFF0000
 
 endif # RGBLED_WIDGET_BATTERY_PULSE
+
+config RGBLED_WIDGET_POWER_CONNECTED_BREATHE
+    bool "Breathe in the full battery colour when USB power arrives"
+    # The nRF52 VBUS detector sits in POWER wherever there is USBD.
+    depends on (SOC_SERIES_NRF52X && HAS_HW_NRF_USBD) || USB_DEVICE_STACK
+    default y
+    help
+      When USB power arrives, the LED breathes in BATTERY_RGB_HIGH: from
+      dark up to the colour as it normally shows (at BRIGHTNESS) and back,
+      POWER_CONNECTED_BREATHE_COUNT times. At boot and on waking from deep
+      sleep with USB power it takes the place of the battery colour, which
+      says nothing on a cable. It tells of the power, not of charging: a
+      full battery breathes too.
+
+      On a half that can send keys over USB, a computer is first given up
+      to a second to take the connection: if the keys move to USB, that
+      connection blink comes first and the breathe after it, in full. A
+      connection blink while it breathes shows at once, and the breathe
+      starts over. It stops when the power goes, and a new layer colour
+      ends it as it ends every indication.
+
+config RGBLED_WIDGET_POWER_CONNECTED_BREATHE_COUNT
+    int "Breaths when USB power arrives"
+    depends on RGBLED_WIDGET_POWER_CONNECTED_BREATHE
+    range 1 10
+    default 2
+
+config RGBLED_WIDGET_POWER_CONNECTED_BREATHE_CYCLE_MS
+    int "Duration of one breath, dark to full and back, in ms"
+    depends on RGBLED_WIDGET_POWER_CONNECTED_BREATHE
+    range 200 10000
+    default 2000
 
 config RGBLED_WIDGET_BLANK_TIMEOUT_MS
     int "Default blanking time in ms, used by any layer that does not set its own (0 = never)"
@@ -363,40 +426,83 @@ config RGBLED_WIDGET_OFF_ON_IDLE
 
 config RGBLED_WIDGET_CONN_REMIND
     bool "Periodically re-blink while the link is down"
+    default y
     help
-      Upstream indicates connectivity only on state-change events and once
-      at boot, so a keyboard that never connected shows nothing after the
-      initial blink. This adds a steady heartbeat until the link comes up.
-      On a central that means the BLE profile; on a peripheral it means the
-      link to the central.
+      Connection status is otherwise shown only on a change and once at
+      boot, so a keyboard whose link is down shows nothing after that one
+      blink. This repeats a short blink in the status colour until the
+      link comes up: CONN_RGB_DISCONNECTED, or CONN_RGB_ADVERTISING while
+      the profile is open for pairing. On a central that means the active
+      BLE profile (nothing while the output is USB); on a peripheral, the
+      link to the central. The first reminder comes CONN_REMIND_PERIOD_S
+      after the last connection blink, then one every period, idle or not,
+      until the link is up or the keyboard sleeps.
 
 config RGBLED_WIDGET_CONN_REMIND_PERIOD_S
     int "Seconds between reminder blinks"
     depends on RGBLED_WIDGET_CONN_REMIND
     default 5
 
-config RGBLED_WIDGET_LAYER_PUSH_MIN_INTERVAL_MS
-    int "Minimum gap between colour pushes to peripherals"
-    depends on RGBLED_WIDGET_LAYER_PUSH
+config RGBLED_WIDGET_CONN_REMIND_BLINK_MS
+    int "Duration of a reminder blink in ms"
+    depends on RGBLED_WIDGET_CONN_REMIND
     default 300
-    help
-      Leading edge rate limit: an isolated layer change goes out at once, a
-      burst collapses into one write per interval, and the last colour always
-      arrives. Writes to the split link draw from the same ACL TX pool the
-      central uses for HID reports to the host, and that link drains slowly
-      (with ZMK_SPLIT_BLE_PREF_LATENCY at its default of 30 the peripheral
-      listens roughly four times a second). Unthrottled pushes therefore park
-      buffers on the split connection and stall the trackball.
 
 config RGBLED_WIDGET_LAYER_PUSH
     bool "Mirror the layer colour onto split peripherals"
     depends on RGBLED_WIDGET_SHOW_LAYER_COLORS && ZMK_SPLIT && ZMK_SPLIT_ROLE_CENTRAL
+    default y
     help
-      ZMK has no split message for layer state, so the central pushes the
-      resolved colour to each peripheral as a behavior invocation. param1
-      is a uint32_t, so the whole 0xRRGGBB value fits and the peripheral
-      needs no copy of the layer table. Requires the lyr_sync behavior node,
-      which this module declares.
+      On by default wherever layer colours are shown on a split central;
+      =n turns it off. ZMK has no split message for layer state, so the
+      central sends the resolved colour and its blanking time to each
+      peripheral as the lyr_sync behavior, which this module declares; the
+      peripheral needs no copy of the layer table, but does need this
+      module. The latest colour always wins.
+
+      Over Bluetooth one write goes at a time to each peripheral: a change
+      goes out at once, and while a write waits for the peripheral's
+      acknowledgement only the latest colour waits behind it. Writes to the
+      split link hold Bluetooth buffers the central shares with its reports
+      to the computer until they are acknowledged, and a peripheral that
+      has gone away but is not yet declared lost acknowledges nothing -- so
+      it holds one at most, and a trackball on the central is not starved.
+      A write that stays unacknowledged past the supervision timeout on a
+      link that is up is stuck in the host's queue and is sent again; for
+      that moment the two are both held. Each new link is sent the current
+      colour.
+
+      On a central with a pointing device, CONFIG_BT_L2CAP_TX_BUF_COUNT=10
+      (with CONFIG_BT_BUF_ACL_TX_COUNT=10) gives the reports to the
+      computer twice the default room. It also makes much rarer a Zephyr
+      3.5 fault that loses a buffer for good when the split link drops
+      while a write waits for one.
+
+      Over a wired split the colour goes through ZMK's own split command,
+      from the system work queue as ZMK sends its own. ZMK does not report
+      a wired peripheral coming back, so one that was unplugged or
+      restarted shows the colour from the next layer change on. A build
+      with both transports sends over Bluetooth only.
+
+config RGBLED_WIDGET_LAYER_PUSH_STACK_SIZE
+    int "Stack of the thread that sends the layer colour"
+    depends on RGBLED_WIDGET_LAYER_PUSH && ZMK_SPLIT_BLE
+    default 1792 if LOG
+    default 1280
+    help
+      Over Bluetooth the colour is sent from a work queue of its own, where
+      waiting for a Bluetooth buffer holds up nothing else. Its deepest
+      path measures about 1.2 KB with logging and 0.5 KB without, plus
+      about 0.2 KB for the queue and an interrupt; the build stops below
+      1536 and 1024. A wired split sends from the system work queue.
+
+config RGBLED_WIDGET_LAYER_PUSH_THREAD_PRIORITY
+    int "Priority of the thread that sends the layer colour"
+    depends on RGBLED_WIDGET_LAYER_PUSH && ZMK_SPLIT_BLE
+    range 0 14
+    default 10
+    help
+      Preemptible, as ZMK's own low-priority work queue.
 
 config RGBLED_WIDGET_LAYER_0_MS
     int "Blank the LED this many ms after layer 0 lights it (0 = never)"
