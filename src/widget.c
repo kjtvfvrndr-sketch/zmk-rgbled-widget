@@ -200,24 +200,29 @@ struct led_command {
     bool drop_indications;
 };
 
-K_MSGQ_DEFINE(led_command_msgq, sizeof(struct led_command), 16, 4);
+K_MSGQ_DEFINE(led_command_msgq, sizeof(struct led_command), RGBLED_WIDGET_INDICATION_QUEUE_LENGTH,
+              4);
+// widget.h promises callers this many indications.
+BUILD_ASSERT(LED_INDICATION_QUEUE_LENGTH == RGBLED_WIDGET_INDICATION_QUEUE_LENGTH,
+             "RGBLED_WIDGET_INDICATION_QUEUE_LENGTH must match LED_INDICATION_QUEUE_LENGTH");
 
-static void send_led_command(const struct led_command *command) {
+// Returns whether the command was queued.
+static bool send_led_command(const struct led_command *command) {
     if (k_msgq_put(&led_command_msgq, command, K_NO_WAIT) == 0) {
-        return;
+        return true;
     }
     if (command->kind == LED_COMMAND_ADD_INDICATION) {
         LOG_DBG("LED commands full, indication #%06X dropped", command->indication.rgb);
-        return;
+        return false;
     }
     // A full queue of commands the LED thread has not got to: the state
     // that follows outranks them.
     LOG_WRN("LED commands full, dropping them for a change of state");
     k_msgq_purge(&led_command_msgq);
-    k_msgq_put(&led_command_msgq, command, K_NO_WAIT);
+    return k_msgq_put(&led_command_msgq, command, K_NO_WAIT) == 0;
 }
 
-static void queue_blink(uint32_t rgb, uint32_t on_ms, uint32_t gap_ms, bool preempts_breathe) {
+static bool queue_blink(uint32_t rgb, uint32_t on_ms, uint32_t gap_ms, bool preempts_breathe) {
     const struct led_command command = {
         .kind = LED_COMMAND_ADD_INDICATION,
         .indication = {.kind = LED_INDICATION_BLINK,
@@ -226,7 +231,24 @@ static void queue_blink(uint32_t rgb, uint32_t on_ms, uint32_t gap_ms, bool pree
                        .gap_ms = gap_ms,
                        .preempts_breathe = preempts_breathe},
     };
-    send_led_command(&command);
+    return send_led_command(&command);
+}
+
+// For other modules (widget.h): count something out on the LED. Each blink is
+// an ordinary indication in the same queue, so it waits behind what is already
+// showing, and a new layer colour cuts it short like any other.
+int rgbled_widget_blink(uint32_t rgb, uint8_t count, uint16_t on_ms, uint16_t off_ms) {
+    // on_ms 0 would be an instant blink, and gap_ms 0 falls back to
+    // RGBLED_WIDGET_INTERVAL_MS -- keep both what the caller asked for.
+    const uint32_t on = MAX(on_ms, 1);
+    const uint32_t gap = MAX(off_ms, 1);
+
+    int queued = 0;
+
+    for (uint8_t i = 0; i < count; i++) {
+        queued += queue_blink(rgb, on, gap, false) ? 1 : 0;
+    }
+    return queued;
 }
 
 // The colour between indications. With drop_indications it cuts them short

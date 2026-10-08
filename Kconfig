@@ -10,6 +10,10 @@ config RGBLED_WIDGET_INTERVAL_MS
     int "Minimum wait duration between two blinks in ms"
     default 500
 
+# Marker for other modules: rgbled_widget_blink() is available (widget.h).
+config RGBLED_WIDGET_BLINK_API
+    def_bool y
+
 # Battery level settings
 
 choice RGBLED_WIDGET_BATTERY_SHOW
