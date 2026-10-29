@@ -7,6 +7,7 @@
 #define DT_DRV_COMPAT zmk_behavior_rgbled_sync
 
 #include <zephyr/device.h>
+#include <zephyr/kernel.h>
 #include <drivers/behavior.h>
 #include <zephyr/logging/log.h>
 
@@ -21,11 +22,26 @@ static int behavior_rgb_sync_init(const struct device *dev) { return 0; }
 static int on_keymap_binding_pressed(struct zmk_behavior_binding *binding,
                                      struct zmk_behavior_binding_event event) {
 #if IS_ENABLED(CONFIG_RGBLED_WIDGET)
+    // Taken as the write came: a synced start is timed from here.
+    const int64_t received_at = k_uptime_get();
+    // The central sends the number of the synced group as the position.
+    const uint8_t sync_id = (uint8_t)event.position;
+
+    if (binding->param1 & RGBLED_WIDGET_PUSHED_INDICATION_FLAG) {
+        // An indication for the whole keyboard (widget.h has the layout).
+        rgbled_widget_show_pushed_indication(binding->param1, binding->param2, sync_id,
+                                             received_at);
+        return ZMK_BEHAVIOR_OPAQUE;
+    }
     // param1 carries the full 0xRRGGBB value pushed by the central, so this
-    // side needs no copy of the layer colour table.
-    LOG_DBG("Received layer colour #%06X (blank after %dms) from central", binding->param1,
-            binding->param2);
-    set_layer_rgb_external(binding->param1, binding->param2);
+    // side needs no copy of the layer colour table -- and above it whether
+    // a synced one cuts the indications short.
+    const uint32_t rgb = binding->param1 & 0xFFFFFFu;
+
+    LOG_DBG("Received layer colour #%06X (blank after %dms) from central%s", rgb,
+            binding->param2, sync_id != 0 ? ", synced" : "");
+    set_layer_rgb_external(rgb, binding->param2, sync_id, received_at,
+                           (binding->param1 & RGBLED_WIDGET_PUSHED_COLOUR_CUTS_INDICATIONS) != 0);
 #endif
     return ZMK_BEHAVIOR_OPAQUE;
 }

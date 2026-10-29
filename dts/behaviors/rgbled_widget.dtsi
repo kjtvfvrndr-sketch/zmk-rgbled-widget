@@ -3,8 +3,11 @@
         /*
          * NOTE: none of these use /omit-if-no-ref/, unlike upstream.
          *
-         * All three carry BEHAVIOR_LOCALITY_GLOBAL, so pressing one on the
-         * central makes ZMK invoke it by name on every peripheral as well
+         * All three carry BEHAVIOR_LOCALITY_GLOBAL -- but on a Bluetooth
+         * central with RGBLED_WIDGET_PUSH_INDICATIONS_TO_PERIPHERALS,
+         * BEHAVIOR_LOCALITY_CENTRAL: that central shows the battery and the
+         * connection on every half at once itself. Global, pressing one on
+         * the central makes ZMK invoke it by name on every peripheral as well
          * (see zmk_behavior_invoke_binding() in app/src/behavior.c). A split
          * peripheral is often built without a keymap, so nothing there would
          * reference the node -- omit-if-no-ref would then drop it from the

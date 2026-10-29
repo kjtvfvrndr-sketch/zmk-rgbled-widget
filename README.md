@@ -20,23 +20,27 @@ It is used to indicate battery level and BLE connection status in a minimalist w
 
 ### Boot report
 
-On power-on and on waking from deep sleep, first the connection, once it has settled — the link up, at most 3 s, and on USB power a computer given up to 1 s to take the keys — then the battery level, or with USB power the breathe below in its place.
+On power-on and on waking from deep sleep, one queue: first the power, at once — the battery level, or with USB power the breathe below in its place — then the links, as soon as they have settled, at most 3 s after boot: 🟣 the halves of a split connected, then the computer's link (🔵, cyan, ⚪). What is known by the end of the power part follows it straight away; what comes later shows by its own blink. On USB power a computer is given up to 1 s to take the keys first. A split central whose peripheral is connected by then but not ready yet waits for it up to 3 s more, so that both show 🟣 and the computer's link together.
+
+A peripheral shows only what is its own — its power at boot, the cable, a low or critical battery — and cyan if its central is not there by 6 s or goes; when it is there, the central shows the rest on both halves.
 
 ### Battery status
 
 - Blink the battery level in the boot report as a gradient: green at `CONFIG_RGBLED_WIDGET_BATTERY_LEVEL_HIGH` (80%) and above, yellow halfway, red at `CONFIG_RGBLED_WIDGET_BATTERY_LEVEL_LOW` (10%) and below — the colours are `CONFIG_RGBLED_WIDGET_BATTERY_RGB_HIGH`, `_MEDIUM` and `_LOW`
   - With `CONFIG_RGBLED_WIDGET_BATTERY_GRADIENT=n` the three colours switch at the two levels instead
   - See [options](#battery-levels-for-splits) for showing battery levels for splits
-- Pulse 🔴 three short blinks every minute while the battery is at `CONFIG_RGBLED_WIDGET_BATTERY_LEVEL_LOW` or below and not on USB power (`CONFIG_RGBLED_WIDGET_BATTERY_PULSE`, on by default)
-- Breathe 🟢 twice, 2 s each, from dark up to `CONFIG_RGBLED_WIDGET_BATTERY_RGB_HIGH` and back, when USB power arrives (`CONFIG_RGBLED_WIDGET_POWER_CONNECTED_BREATHE`, on by default) — it tells of the power, not of charging
-  - If the keys move to USB with it, that blink comes first and the breathe after it, in full; a charger breathes after a second
-  - A connection blink meanwhile shows at once and the breathe starts over; it stops when the power goes
+- Breathe 🔴 twice, 1 s each, every minute while the battery is at `CONFIG_RGBLED_WIDGET_BATTERY_LEVEL_LOW` or below and not on USB power (`CONFIG_RGBLED_WIDGET_BATTERY_PULSE`, on by default) — a breath, not blinks: three short red blinks are a refused request (zmk-ble-host-link)
+- Breathe 🟢 twice, 1 s each — as long as the battery blink — from dark up to `CONFIG_RGBLED_WIDGET_BATTERY_RGB_HIGH` and back, when USB power arrives (`CONFIG_RGBLED_WIDGET_POWER_CONNECTED_BREATHE`, on by default) — it tells of the power, not of charging
+  - It starts at once; if the keys then move to USB, that blink ⚪ waits for its end (on a split, on both halves at once); it stops when the power goes
+- A level not measured yet (0) blinks red, as no charge would; the log tells the two apart
 
 ### Connection status
 
-- Blink 🔵 for connected, cyan for open (waiting to pair) or for a paired profile whose host is not connected, in the boot report and on every change (only on central side for splits)
+- Blink 🔵 for connected, cyan for open (waiting to pair) or for a paired profile whose host is not connected, in the boot report and on every change
 - Blink ⚪ when the keys go to USB, and the BLE status when they go back (`CONFIG_RGBLED_WIDGET_CONN_SHOW_USB`, on by default): it follows where the keys go, not the power — a charger, or a cable while the keys stay on Bluetooth, changes nothing
-- Blink 🔵 for connected, cyan for disconnected on peripheral side of splits
+- On a split these are the whole keyboard's: the central shows them on the peripherals too (`CONFIG_RGBLED_WIDGET_PUSH_INDICATIONS_TO_PERIPHERALS`, on by default with the layer colour push), along with the reminders below, the battery key and the blinks other modules send with `rgbled_widget_blink_on_all_halves()` — [at the same moment](#one-moment-on-every-half) on every half over Bluetooth
+- Blink 🟣 on both halves at once when the halves connect to each other (`CONFIG_RGBLED_WIDGET_CONN_RGB_SPLIT_CONNECTED`): the central shows it on itself and the peripheral that came, once that one is ready (about 2 s after the link). A peripheral connecting later is not sent the computer's link: that shows when it changes
+- Blink cyan on a peripheral still looking for its central; its own battery and power stay its own
 - While the link is down, repeat a short blink in its colour every 5 s (`CONFIG_RGBLED_WIDGET_CONN_REMIND`, on by default), counted from the last connection blink and kept up while idle, until the link is up or the keyboard sleeps
 
 ### Layer state
@@ -50,7 +54,19 @@ You can pick one of the following methods (off by default) to indicate the highe
 
 The layer is resolved on the central part of a split keyboard, since peripheral parts aren't aware of the layer information; layer colours are mirrored to the peripherals as above, the blink sequence is not.
 
-A new layer colour ends whatever the LED is showing and what waits to be shown — blinks, the battery, the breathe, the boot report — and shows at once: the keyboard is in use. The same colour again ends nothing, nor does the colour a peripheral is sent each time it connects.
+A new layer colour ends whatever the LED is showing and what waits to be shown — blinks, the battery, the breathe, the boot report — and shows at once: the keyboard is in use. The same colour again ends nothing, nor does the colour a peripheral is sent each time it connects. On a Bluetooth split "at once" is the moment both halves can show it ([below](#one-moment-on-every-half)).
+
+### One moment on every half
+
+Over Bluetooth a peripheral hears from the central only when it attends a connection event — with its latency, every `interval × (latency + 1)` of the split link: about 0.17 s while typing with zmk-split-conn-ladder, up to 0.4–0.6 s when idle. So the central does not show a layer colour or a shared indication on its own LED first: it sends it, and both halves start at one moment.
+
+1. The central sends a group (an indication, or a layer change) to each ready peripheral when its turn comes on the central's own LED — up to four writes at once.
+2. The peripheral works out when it can start it — when what it shows now is over (its own that wait go after), and no sooner than one connection interval and 20 ms — and answers at once over a characteristic of its own. Having something to send, it attends the very next connection event.
+3. Both time that start from the connection event that delivered the write: the peripheral from receiving it, the central from its link-layer acknowledgement in the same event.
+
+A key on the peripheral changes the layer within about three connection intervals (some 40 ms while typing): it is attending then. A group sent while another waits there follows it straight away on both. A group goes only to peripherals ready when its turn comes — one connecting later starts with 🟣. A write waits up to 2 s to go out, 1 s for its acknowledgement and then 1 s for the answer; a peripheral that misses a wait, or goes away, is left out and the central shows the group on its own. The central decides for every half whether a layer colour cuts the indications short. Both halves need this firmware, of the same version: a peripheral without the answers shows what it is sent on arrival, and halves of different versions may disagree on details.
+
+A layer colour shows at least `CONFIG_RGBLED_WIDGET_LAYER_COLOUR_SHOWN_AT_LEAST_MS` (100 ms), or until it blanks if sooner, before the next one replaces it: a quick tap of a layer key, whose press and release can reach the other half in one connection event, still flashes in full on both. No colour comes more than that time late, however quickly the layers change.
 
 > [!TIP]
 > Also see [below](#showing-status-on-demand) for keymap behaviors you can use to show the battery and connection status on demand.
@@ -113,7 +129,7 @@ This module also defines keymap [behaviors](https://zmk.dev/docs/keymaps/behavio
 ```
 
 When you invoke the behavior by pressing the corresponding key (or combo), it will trigger the corresponding indicator on the LED.
-This will happen on all keyboard parts for split keyboards, so make sure to flash firmware to all parts after enabling.
+This will happen on all keyboard parts for split keyboards, so make sure to flash firmware to all parts after enabling. With `CONFIG_RGBLED_WIDGET_PUSH_INDICATIONS_TO_PERIPHERALS` over Bluetooth the central does it for all at once: `&ind_bat` shows each part's own battery at the same moment, `&ind_con` the computer's link.
 
 > [!NOTE]
 > The behaviors can be used even when you use split keyboards with different controllers that don't all support the widget.
@@ -130,7 +146,7 @@ This can be done by enabling one of the below settings:
 
 These two settings only apply to split central parts.
 The order of blinks for peripherals is determined by the initial pairing order for the split parts.
-If a part is currently disconnected, a magenta/purple ([configurable](#configuration-details)) blink will be displayed.
+A level not received from a part -- disconnected, say -- blinks as `CONFIG_RGBLED_WIDGET_BATTERY_RGB_MISSING`, red by default ([configurable](#configuration-details)).
 
 ## Configuration details
 
@@ -140,6 +156,7 @@ If a part is currently disconnected, a magenta/purple ([configurable](#configura
 | Name                               | Description                                    | Default |
 | ---------------------------------- | ---------------------------------------------- | ------- |
 | `CONFIG_RGBLED_WIDGET_INTERVAL_MS` | Minimum wait duration between two blinks in ms | 500     |
+| `CONFIG_RGBLED_WIDGET_LOG_LED_THREAD_STALLS` | Log a WRN when the LED thread stops taking its commands for 3 s (with its state), an INF when it moves again | `y` with the widget's DBG logs |
 
 </details>
 
@@ -155,14 +172,16 @@ If a part is currently disconnected, a magenta/purple ([configurable](#configura
 | `CONFIG_RGBLED_WIDGET_BATTERY_RGB_HIGH`       | High battery colour                                                   | `0x00FF00`    |
 | `CONFIG_RGBLED_WIDGET_BATTERY_RGB_MEDIUM`     | Medium battery colour (the gradient's midpoint)                       | `0xFFFF00`    |
 | `CONFIG_RGBLED_WIDGET_BATTERY_RGB_LOW`        | Low battery colour                                                    | `0xFF0000`    |
-| `CONFIG_RGBLED_WIDGET_BATTERY_RGB_MISSING`    | Colour for battery not detected, or peripheral disconnected           | `0xFF00FF`    |
-| `CONFIG_RGBLED_WIDGET_BATTERY_PULSE`          | Pulse while the battery is low                                        | `y`           |
-| `CONFIG_RGBLED_WIDGET_BATTERY_PULSE_LEVEL`    | Pulse at and below this percentage                                    | `LEVEL_LOW`   |
+| `CONFIG_RGBLED_WIDGET_BATTERY_RGB_MISSING`    | Colour for a level not measured yet, or a peripheral's not received   | `0xFF0000`    |
+| `CONFIG_RGBLED_WIDGET_BATTERY_PULSE`          | Breathe a warning while the battery is low                            | `y`           |
+| `CONFIG_RGBLED_WIDGET_BATTERY_PULSE_LEVEL`    | At and below this percentage                                          | `LEVEL_LOW`   |
+| `CONFIG_RGBLED_WIDGET_BATTERY_PULSE_COUNT`    | Breaths per warning                                                   | 2             |
+| `CONFIG_RGBLED_WIDGET_BATTERY_PULSE_BREATHE_CYCLE_MS` | One warning breath, in ms                                     | 1000          |
 | `CONFIG_RGBLED_WIDGET_BATTERY_LEVEL_CRITICAL` | One blink on every reported level at or below this (0 = off)          | 0             |
 | `CONFIG_RGBLED_WIDGET_BATTERY_RGB_CRITICAL`   | Colour of that blink                                                  | `0xFF0000`    |
 | `CONFIG_RGBLED_WIDGET_POWER_CONNECTED_BREATHE` | Breathe in `BATTERY_RGB_HIGH` when USB power arrives                 | `y`           |
 | `CONFIG_RGBLED_WIDGET_POWER_CONNECTED_BREATHE_COUNT` | Breaths                                                         | 2             |
-| `CONFIG_RGBLED_WIDGET_POWER_CONNECTED_BREATHE_CYCLE_MS` | One breath, dark to full and back, in ms                     | 2000          |
+| `CONFIG_RGBLED_WIDGET_POWER_CONNECTED_BREATHE_CYCLE_MS` | One breath, dark to full and back, in ms                     | 1000          |
 
 Only one of the options below can be enabled.
 The non-default ones (second and third below) only work on central parts of splits.
@@ -189,6 +208,9 @@ The non-default ones (second and third below) only work on central parts of spli
 | `CONFIG_RGBLED_WIDGET_CONN_RGB_ADVERTISING`    | Colour for a profile open for pairing                       | `0x00FFFF`   |
 | `CONFIG_RGBLED_WIDGET_CONN_RGB_DISCONNECTED`   | Colour for a paired profile without its host                | `0x00FFFF`   |
 | `CONFIG_RGBLED_WIDGET_CONN_RGB_USB`            | Colour for USB endpoint active                              | `0xFFFFFF`   |
+| `CONFIG_RGBLED_WIDGET_CONN_RGB_SPLIT_CONNECTED` | Colour for the halves of a split connected                 | `0xFF00FF`   |
+| `CONFIG_RGBLED_WIDGET_PUSH_INDICATIONS_TO_PERIPHERALS` | On a split central, show the computer's link, the battery key and shared blinks on the peripherals | `y` |
+| `CONFIG_RGBLED_WIDGET_LAYER_COLOUR_SHOWN_AT_LEAST_MS` | A layer colour shows at least this long (or until it blanks) before the next one (0: off) | 100 |
 
 </details>
 

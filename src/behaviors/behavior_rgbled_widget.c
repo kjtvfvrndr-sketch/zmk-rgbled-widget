@@ -54,7 +54,15 @@ static int on_keymap_binding_released(struct zmk_behavior_binding *binding,
 static const struct behavior_driver_api behavior_rgb_wdg_driver_api = {
     .binding_pressed = on_keymap_binding_pressed,
     .binding_released = on_keymap_binding_released,
+#if IS_ENABLED(CONFIG_RGBLED_WIDGET) && IS_ENABLED(CONFIG_ZMK_SPLIT_BLE) &&                      \
+    IS_ENABLED(CONFIG_RGBLED_WIDGET_PUSH_INDICATIONS_TO_PERIPHERALS)
+    // The central shows the battery and the connection on every half at
+    // once itself; invoked there too, a peripheral would show them on
+    // arrival instead.
+    .locality = BEHAVIOR_LOCALITY_CENTRAL,
+#else
     .locality = BEHAVIOR_LOCALITY_GLOBAL,
+#endif
 #if IS_ENABLED(CONFIG_ZMK_BEHAVIOR_METADATA)
     .get_parameter_metadata = zmk_behavior_get_empty_param_metadata,
 #endif // IS_ENABLED(CONFIG_ZMK_BEHAVIOR_METADATA)

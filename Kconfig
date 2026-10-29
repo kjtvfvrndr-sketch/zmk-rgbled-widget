@@ -14,6 +14,12 @@ config RGBLED_WIDGET_INTERVAL_MS
 config RGBLED_WIDGET_BLINK_API
     def_bool y
 
+# Marker for other modules: rgbled_widget_blink_on_all_halves() is available
+# (widget.h) -- a blink shown on every half of a split, for what concerns the
+# whole keyboard.
+config RGBLED_WIDGET_BLINK_ON_ALL_HALVES_API
+    def_bool y
+
 # Battery level settings
 
 choice RGBLED_WIDGET_BATTERY_SHOW
@@ -80,8 +86,12 @@ config RGBLED_WIDGET_BATTERY_RGB_CRITICAL
     default 0xFF0000
 
 config RGBLED_WIDGET_BATTERY_RGB_MISSING
-    hex "Color for battery not detected, or peripheral disconnected (0xRRGGBB)"
-    default 0xFF00FF
+    hex "Color for a battery level not measured yet, or a peripheral's not received (0xRRGGBB)"
+    default 0xFF0000
+    help
+      A level of 0 means nothing measured -- so, for all the keyboard can
+      tell, no charge: the low battery colour by default. The log tells it
+      from a battery that is really low.
 
 # Connectivity indicator settings
 config RGBLED_WIDGET_CONN_BLINK_MS
@@ -119,6 +129,18 @@ config RGBLED_WIDGET_CONN_RGB_DISCONNECTED
 config RGBLED_WIDGET_CONN_RGB_USB
     hex "Color for USB endpoint active (0xRRGGBB)"
     default 0xFFFFFF
+
+config RGBLED_WIDGET_CONN_RGB_SPLIT_CONNECTED
+    hex "Color for the halves of a split connected to each other (0xRRGGBB)"
+    default 0xFF00FF
+    help
+      A colour of its own, so that blue and cyan always mean the computer.
+      Over Bluetooth with LAYER_PUSH the central shows it on itself and on
+      the peripheral that came, at the same moment, once that one is ready
+      to be synced with (a couple of seconds after the link, for its
+      discovery); a peripheral shows none of its own. Without LAYER_PUSH
+      the central shows it alone. A peripheral still looking for its
+      central keeps CONN_RGB_DISCONNECTED and its reminders.
 
 # Layer indicator settings
 config RGBLED_WIDGET_SHOW_LAYER_CHANGE
@@ -326,7 +348,7 @@ config RGBLED_WIDGET_BATTERY_GRADIENT
       at the two levels.
 
 config RGBLED_WIDGET_BATTERY_PULSE
-    bool "Periodically pulse a warning while the battery is low"
+    bool "Periodically breathe a warning while the battery is low"
     depends on ZMK_BATTERY_REPORTING
     default y
     help
@@ -350,17 +372,18 @@ config RGBLED_WIDGET_BATTERY_PULSE_PERIOD_S
     default 60
 
 config RGBLED_WIDGET_BATTERY_PULSE_COUNT
-    int "Number of blinks per group"
+    int "Breaths per warning"
     range 1 8
-    default 3
+    default 2
 
-config RGBLED_WIDGET_BATTERY_PULSE_MS
-    int "Duration of each pulse blink in ms"
-    default 100
-
-config RGBLED_WIDGET_BATTERY_PULSE_GAP_MS
-    int "Gap between blinks within a group, in ms"
-    default 150
+config RGBLED_WIDGET_BATTERY_PULSE_BREATHE_CYCLE_MS
+    int "Duration of one warning breath, dark to full and back, in ms"
+    range 200 10000
+    default 1000
+    help
+      A breath, like the one when USB power arrives -- red for want of
+      power, green for power there -- so it is not taken for the three
+      short red blinks of a refusal (zmk-ble-host-link).
 
 config RGBLED_WIDGET_BATTERY_PULSE_RGB
     hex "Colour of the low battery pulse (0xRRGGBB)"
@@ -381,12 +404,11 @@ config RGBLED_WIDGET_POWER_CONNECTED_BREATHE
       says nothing on a cable. It tells of the power, not of charging: a
       full battery breathes too.
 
-      On a half that can send keys over USB, a computer is first given up
-      to a second to take the connection: if the keys move to USB, that
-      connection blink comes first and the breathe after it, in full. A
-      connection blink while it breathes shows at once, and the breathe
-      starts over. It stops when the power goes, and a new layer colour
-      ends it as it ends every indication.
+      On a running half it starts at once: if a computer then takes the
+      connection, that connection blink waits for the breathe to end -- on
+      a central it then shows on every half at once. It stops when the
+      power goes, and a new layer colour ends it as it ends every
+      indication.
 
 config RGBLED_WIDGET_POWER_CONNECTED_BREATHE_COUNT
     int "Breaths when USB power arrives"
@@ -398,7 +420,11 @@ config RGBLED_WIDGET_POWER_CONNECTED_BREATHE_CYCLE_MS
     int "Duration of one breath, dark to full and back, in ms"
     depends on RGBLED_WIDGET_POWER_CONNECTED_BREATHE
     range 200 10000
-    default 2000
+    default 1000
+    help
+      Two breaths of 1 s take as long as the battery colour on battery
+      (BATTERY_BLINK_MS), so at boot both halves get to the connection
+      blinks together.
 
 config RGBLED_WIDGET_BLANK_TIMEOUT_MS
     int "Default blanking time in ms, used by any layer that does not set its own (0 = never)"
@@ -416,6 +442,24 @@ config RGBLED_WIDGET_BLANK_TIMEOUT_MS
       means the LED is lit essentially all the time. 800 ms is still easy to
       catch out of the corner of your eye. Set 0 to keep the colour until the
       next change.
+
+config RGBLED_WIDGET_LAYER_COLOUR_SHOWN_AT_LEAST_MS
+    int "A layer colour shows at least this long before the next one (ms, 0: off)"
+    range 0 1000
+    default 100
+    help
+      A new layer colour waits until the one before it has shown this long
+      -- or until that one blanked, if sooner; a colour that lights nothing
+      (0x000000) holds nothing back. So a quick tap of a layer key still
+      flashes in full: on a split over Bluetooth the press and the release
+      can reach the other half in the same connection event, and both
+      halves would otherwise change twice within milliseconds. Each half
+      times it from the moments both agreed on, so they stay together --
+      set it alike on both; after a sleep, or a colour one half shows alone
+      (the other not ready, or left out), they may differ once by up to
+      this much. The cost: a change that follows within this time comes up
+      to this much later -- never more, however many follow, so a burst
+      does not pile up. 0 shows every colour at once.
 
 config RGBLED_WIDGET_OFF_ON_IDLE
     bool "Turn the LED off when the keyboard goes idle"
@@ -464,17 +508,27 @@ config RGBLED_WIDGET_LAYER_PUSH
       peripheral needs no copy of the layer table, but does need this
       module. The latest colour always wins.
 
-      Over Bluetooth one write goes at a time to each peripheral: a change
-      goes out at once, and while a write waits for the peripheral's
-      acknowledgement only the latest colour waits behind it. Writes to the
-      split link hold Bluetooth buffers the central shares with its reports
-      to the computer until they are acknowledged, and a peripheral that
-      has gone away but is not yet declared lost acknowledges nothing -- so
-      it holds one at most, and a trackball on the central is not starved.
-      A write that stays unacknowledged past the supervision timeout on a
-      link that is up is stuck in the host's queue and is sent again; for
-      that moment the two are both held. Each new link is sent the current
-      colour.
+      Over Bluetooth a layer change shows on every half at the same moment.
+      The central sends it to each peripheral that is ready; the peripheral
+      answers, over a characteristic of its own, when it will show it --
+      timed from the connection event that brought the write -- and the
+      central shows it then too. So this half shows its own change as late
+      as the other half hears of it: up to one attendance of the other half
+      (interval * (latency + 1) of the split link) and one connection
+      interval more. A colour not sent yet is replaced by the next. A
+      peripheral that does not answer within a second is left out, and one
+      just connected is sent the current colour on its own once it is
+      ready. Both halves need this firmware; a peripheral without the
+      answers shows what it is sent on arrival.
+
+      Writes to the split link hold Bluetooth buffers the central shares
+      with its reports to the computer until they are acknowledged, and a
+      peripheral that has gone away but is not yet declared lost
+      acknowledges nothing -- so at most four wait per peripheral, and a
+      trackball on the central is not starved. Writes that stay
+      unacknowledged past the supervision timeout on a link that is up are
+      stuck in the host's queue: they are written off and the colour is
+      sent again.
 
       On a central with a pointing device, CONFIG_BT_L2CAP_TX_BUF_COUNT=10
       (with CONFIG_BT_BUF_ACL_TX_COUNT=10) gives the reports to the
@@ -483,10 +537,30 @@ config RGBLED_WIDGET_LAYER_PUSH
       while a write waits for one.
 
       Over a wired split the colour goes through ZMK's own split command,
-      from the system work queue as ZMK sends its own. ZMK does not report
-      a wired peripheral coming back, so one that was unplugged or
-      restarted shows the colour from the next layer change on. A build
-      with both transports sends over Bluetooth only.
+      from the system work queue as ZMK sends its own, and shows on arrival.
+      ZMK does not report a wired peripheral coming back, so one that was
+      unplugged or restarted shows the colour from the next layer change
+      on. A build with both transports sends over Bluetooth only.
+
+config RGBLED_WIDGET_PUSH_INDICATIONS_TO_PERIPHERALS
+    bool "Show what concerns the whole keyboard on split peripherals too"
+    depends on RGBLED_WIDGET_LAYER_PUSH
+    default y
+    help
+      The state of the computer's link -- blue connected, cyan open or not
+      connected (and its reminders), white the keys on USB -- the battery
+      key (each half its own colour) and the blinks other modules send with
+      rgbled_widget_blink_on_all_halves(), such as zmk-ble-host-link's
+      answers, show on every peripheral too. Over Bluetooth they show on
+      every half at the same moment, as the layer colour does: each goes
+      out when its turn comes on the central's LED, and the central holds
+      it until the peripherals have answered when they can show it -- after
+      what a peripheral shows at that moment, ahead of what of its own
+      waits. A peripheral that is not ready when an indication's turn
+      comes is not sent it: one connecting later starts with the
+      split-connected blink. What is the half's own -- its battery at boot and when
+      low, its USB power, its link to the central when that is down --
+      stays on that half.
 
 config RGBLED_WIDGET_LAYER_PUSH_STACK_SIZE
     int "Stack of the thread that sends the layer colour"
@@ -495,7 +569,7 @@ config RGBLED_WIDGET_LAYER_PUSH_STACK_SIZE
     default 1280
     help
       Over Bluetooth the colour is sent from a work queue of its own, where
-      waiting for a Bluetooth buffer holds up nothing else. Its deepest
+      waiting for a Bluetooth buffer holds up nothing outside it. Its deepest
       path measures about 1.2 KB with logging and 0.5 KB without, plus
       about 0.2 KB for the queue and an interrupt; the build stops below
       1536 and 1024. A wired split sends from the system work queue.
@@ -635,6 +709,20 @@ config RGBLED_WIDGET_LAYER_30_MS
 config RGBLED_WIDGET_LAYER_31_MS
     int "Blank the LED this many ms after layer 31 lights it (0 = never)"
     default RGBLED_WIDGET_BLANK_TIMEOUT_MS
+
+config RGBLED_WIDGET_LOG_LED_THREAD_STALLS
+    bool "Log when the LED thread stops taking its commands"
+    default y if RGBLED_WIDGET_LOG_LEVEL_DBG
+    help
+      Once a second, from the system work queue, whether the LED thread
+      still goes round its loop when it should: with commands waiting for
+      it, or past the time it meant to. A WRN once it has not for 3 s --
+      with the thread's state (pending, and on what: the strip lock, or an
+      object's address for zephyr.map; or just not getting the CPU), the
+      commands waiting and whether the first indication holds for a synced
+      start -- and an INF when it moves again. For an LED that
+      stops showing anything while the rest of the keyboard works. On with
+      the widget's DBG logs; it wakes the CPU once a second.
 
 # The widget logs under its own module rather than ZMK's, so its output can
 # be turned down without touching anything else. Default is INF: start-up,
